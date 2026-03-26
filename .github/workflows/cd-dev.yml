@@ -11,25 +11,40 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # -------------------------------
+      # Metadata
+      # -------------------------------
       - name: Set Metadata
         run: |
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-      - name: Deploy
+      # -------------------------------
+      # Deploy (FIXED)
+      # -------------------------------
+      - name: Deploy to Railway (DEV)
         run: |
-          curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_PROJECT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
-          -H "Authorization: Bearer ${{ secrets.RAILWAY_API_TOKEN_STAGING }}"
+          curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_ENVIRONMENT_ID_DEV }}/service/${{ secrets.RAILWAY_SERVICE_ID_DEV }}/deploy" \
+          -H "Authorization: Bearer ${{ secrets.RAILWAY_API_TOKEN_DEV }}"
 
+      # -------------------------------
+      # Wait
+      # -------------------------------
       - run: sleep 20
 
+      # -------------------------------
+      # Health Check
+      # -------------------------------
       - name: Health
         run: |
           RESPONSE=$(curl -s $URL)
           echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
 
-      - name: Email
+      # -------------------------------
+      # Email (FIXED)
+      # -------------------------------
+      - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -40,6 +55,7 @@ jobs:
           subject: "🚀 DEV DEPLOY SUCCESS"
           to: ${{ secrets.MAIL_TO_DEV }}
           cc: ${{ secrets.MAIL_CC_DEV }}
+          from: ${{ secrets.MAIL_USERNAME_DEV }}   # ✅ IMPORTANT FIX
           body: |
             DEV DEPLOY SUCCESS 🚀
 
