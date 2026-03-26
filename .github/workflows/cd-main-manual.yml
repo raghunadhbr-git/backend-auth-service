@@ -2,6 +2,10 @@ name: CD - Main Manual
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Enter tag (v1.0.0 or commit SHA)"
+        required: true
 
 jobs:
   deploy:
@@ -9,72 +13,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      # ----------------------------------------
-      # FETCH TAGS
-      # ----------------------------------------
-      - name: Fetch Tags
-        run: git fetch --tags
-
-      # ----------------------------------------
-      # GET LATEST TAG
-      # ----------------------------------------
-      - name: Get Latest Tag
+      - name: Set Metadata
         run: |
-          TAG=$(git tag --sort=-v:refname | head -n 1)
-
-          if [ -z "$TAG" ]; then
-            echo "❌ No tags found"
-            exit 1
-          fi
-
-          echo "TAG=$TAG" >> $GITHUB_ENV
-          echo "IMAGE=pythoncodelife/auth-service:$TAG" >> $GITHUB_ENV
+          echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "IMAGE=pythoncodelife/auth-service:${{ github.event.inputs.tag }}" >> $GITHUB_ENV
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-          echo "📌 Deploying tag: $TAG"
-
-      # ----------------------------------------
-      # VERIFY IMAGE EXISTS
-      # ----------------------------------------
-      - name: Check Image
-        run: |
-          if ! docker manifest inspect $IMAGE > /dev/null 2>&1; then
-            echo "❌ Image not found: $IMAGE"
-            exit 1
-          fi
-
-          echo "✅ Image exists"
-
-      # ----------------------------------------
-      # PULL IMAGE
-      # ----------------------------------------
-      - name: Pull Image
+      - name: Pull Docker Image
         run: docker pull $IMAGE
 
-      # ----------------------------------------
-      # DEPLOY
-      # ----------------------------------------
-      - name: Deploy
+      - name: Deploy to Railway
         run: |
           curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_ENVIRONMENT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
           -H "Authorization: Bearer ${{ secrets.RAILWAY_API_TOKEN_STAGING }}"
 
-      - run: sleep 25
+      - run: sleep 30
 
-      # ----------------------------------------
-      # HEALTH CHECK
-      # ----------------------------------------
       - name: Health Check
         run: |
           RESPONSE=$(curl -s $URL)
           echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
 
-      # ----------------------------------------
-      # EMAIL
-      # ----------------------------------------
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -83,9 +43,10 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_STAGING }}
           password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "🚀 PROD DEPLOY SUCCESS"
+          subject: "🚀 PROD DEPLOY SUCCESS - ${{ env.TAG }}"
           to: ${{ secrets.MAIL_TO_STAGING }}
           cc: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_STAGING }}
           body: |
             PROD DEPLOY SUCCESS 🚀
 
