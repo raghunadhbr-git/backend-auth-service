@@ -1,7 +1,12 @@
-name: Release Tags Manual (Simple)
+name: Release Tags (Manual Controlled)
 
 on:
   workflow_dispatch:
+    inputs:
+      proceed:
+        description: "Type YES to proceed"
+        required: true
+        default: "NO"
 
 jobs:
   release:
@@ -13,25 +18,55 @@ jobs:
       - name: Fetch Tags
         run: git fetch --tags
 
+      # ✅ Get latest tag
       - name: Get Latest Tag
+        id: tag
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
-          echo "Latest tag: $LATEST_TAG"
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          echo "LATEST_TAG=$LATEST" >> $GITHUB_ENV
+          echo "📌 Latest tag: $LATEST"
 
-      - name: Show Commits
+      # ✅ Show changes
+      - name: Show Changes
         run: |
-          echo "Changes:"
-          git log $(git describe --tags --abbrev=0 2>/dev/null || echo "")..HEAD --oneline || echo "No commits"
+          echo "📜 Changes since last tag:"
+          git log $LATEST_TAG..HEAD --oneline || echo "No changes"
 
+      # ✅ Increment version
+      - name: Increment Tag
+        run: |
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH+1))
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "💡 New tag: $NEW_TAG"
+
+      # ❗ Require confirmation
+      - name: Check Proceed
+        run: |
+          if [ "${{ github.event.inputs.proceed }}" != "YES" ]; then
+            echo "❌ Skipped (proceed != YES)"
+            exit 0
+          fi
+
+      # ✅ Create tag
       - name: Create Tag
         run: |
-          TAG="v1.0.$RANDOM"
-          echo "Using tag: $TAG"
-          git tag $TAG
-          git push origin $TAG
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+          echo "✅ Tag created: $NEW_TAG"
 
+      # ✅ Create release
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          name: "Release"
+          tag_name: ${{ env.NEW_TAG }}
+          name: "🚀 Release ${{ env.NEW_TAG }}"
+          body: |
+            Changes:
+            ${{ steps.tag.outputs.LATEST_TAG }}
+
+      - name: Done
+        run: echo "🎯 Release completed"
