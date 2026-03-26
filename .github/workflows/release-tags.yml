@@ -1,19 +1,14 @@
-name: Release Tags (Manual Controlled)
+name: Release Tags
 
 on:
   workflow_dispatch:
-    inputs:
-      proceed:
-        description: "Type YES to proceed"
-        required: true
-        default: "NO"
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
     steps:
-      # ✅ IMPORTANT FIX: fetch full history + tags
+      # ✅ FULL history (important)
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -22,66 +17,61 @@ jobs:
         run: git fetch --tags
 
       # ----------------------------------------
-      # Get Latest Tag (CORRECT NOW)
+      # STEP 1: Get Latest Tag
       # ----------------------------------------
       - name: Get Latest Tag
         run: |
-          LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
-          
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.0.0"
+          LATEST=$(git tag --sort=-v:refname | head -n 1)
+
+          if [ -z "$LATEST" ]; then
+            LATEST="v1.0.0"
           fi
 
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-          echo "📌 Latest tag: $LATEST_TAG"
+          echo "LATEST_TAG=$LATEST" >> $GITHUB_ENV
+          echo "📌 Latest tag: $LATEST"
 
       # ----------------------------------------
-      # Show Changes
+      # STEP 2: Show Changes
       # ----------------------------------------
       - name: Show Changes
         run: |
-          echo "📜 Changes since last tag:"
+          echo "--------------------------------"
+          echo "📜 Changes since last release:"
           git log $LATEST_TAG..HEAD --oneline || echo "No changes"
+          echo "--------------------------------"
 
       # ----------------------------------------
-      # Increment Tag SAFELY
+      # STEP 3: Increment Version
       # ----------------------------------------
       - name: Increment Tag
         run: |
           VERSION=${LATEST_TAG#v}
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
           PATCH=$((PATCH+1))
 
           NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+
           echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
           echo "💡 New tag: $NEW_TAG"
 
       # ----------------------------------------
-      # Confirm Proceed
-      # ----------------------------------------
-      - name: Check Proceed
-        run: |
-          if [ "${{ github.event.inputs.proceed }}" != "YES" ]; then
-            echo "❌ Skipped (proceed != YES)"
-            exit 0
-          fi
-
-      # ----------------------------------------
-      # Create Tag (SAFE CHECK)
+      # STEP 4: Create Tag (SAFE)
       # ----------------------------------------
       - name: Create Tag
         run: |
           if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
-            echo "⚠️ Tag already exists. Skipping..."
+            echo "⚠️ Tag already exists → skipping"
             exit 0
           fi
 
           git tag $NEW_TAG
           git push origin $NEW_TAG
+
           echo "✅ Tag created: $NEW_TAG"
 
       # ----------------------------------------
-      # Create Release
+      # STEP 5: Create Release
       # ----------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -89,8 +79,20 @@ jobs:
           tag_name: ${{ env.NEW_TAG }}
           name: "🚀 Release ${{ env.NEW_TAG }}"
           body: |
-            Changes:
-            See commit history in Actions logs
+            🔥 Auto Release
 
+            Latest Tag:
+            ${{ env.LATEST_TAG }}
+
+            New Tag:
+            ${{ env.NEW_TAG }}
+
+            --------------------------------
+            Changes:
+            See workflow logs
+
+      # ----------------------------------------
+      # DONE
+      # ----------------------------------------
       - name: Done
-        run: echo "🎯 Release completed successfully 🚀"
+        run: echo "🎯 RELEASE COMPLETED SUCCESSFULLY 🚀"
