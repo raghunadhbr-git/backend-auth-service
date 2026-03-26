@@ -13,42 +13,68 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # Metadata
+      # ----------------------------------------
+      # METADATA
+      # ----------------------------------------
       - name: Set Metadata
         run: |
           echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_ENV
+          echo "IMAGE_SHA=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "IMAGE_LATEST=pythoncodelife/auth-service:latest" >> $GITHUB_ENV
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-      # Docker login
+      # ----------------------------------------
+      # DOCKER LOGIN
+      # ----------------------------------------
       - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" --password-stdin
 
-      # Build
+      # ----------------------------------------
+      # BUILD IMAGE
+      # ----------------------------------------
       - name: Build Image
-        run: docker build -t $IMAGE .
+        run: docker build -t $IMAGE_SHA .
 
-      # Push SHA
-      - name: Push SHA
-        run: docker push $IMAGE
+      # ----------------------------------------
+      # PUSH SHA IMAGE
+      # ----------------------------------------
+      - name: Push SHA Image
+        run: docker push $IMAGE_SHA
 
-      # Tag latest
+      # ----------------------------------------
+      # TAG + PUSH LATEST
+      # ----------------------------------------
       - name: Tag Latest
         run: |
-          docker tag $IMAGE pythoncodelife/auth-service:latest
-          docker push pythoncodelife/auth-service:latest
+          docker tag $IMAGE_SHA $IMAGE_LATEST
+          docker push $IMAGE_LATEST
 
-      # Tag version (if tag)
-      - name: Tag Version
+      # ----------------------------------------
+      # TAG VERSION (IMPORTANT)
+      # ----------------------------------------
+      - name: Tag Version (Release Tag)
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          docker tag $IMAGE pythoncodelife/auth-service:$TAG
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+          docker tag $IMAGE_SHA pythoncodelife/auth-service:$TAG
           docker push pythoncodelife/auth-service:$TAG
 
-      # Email Success
+      # ----------------------------------------
+      # VERIFY IMAGE (NEW ADD)
+      # ----------------------------------------
+      - name: Verify Image Exists
+        run: |
+          echo "Checking image..."
+          docker manifest inspect $IMAGE_SHA || exit 1
+
+      # ----------------------------------------
+      # EMAIL SUCCESS
+      # ----------------------------------------
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -67,13 +93,17 @@ jobs:
             Branch: ${{ env.BRANCH }}
             Commit: ${{ env.COMMIT }}
 
-            Docker Image:
-            ${{ env.IMAGE }}
+            Images:
+            SHA: ${{ env.IMAGE_SHA }}
+            LATEST: ${{ env.IMAGE_LATEST }}
+            TAG: ${{ env.TAG }}
 
             URL:
             ${{ env.URL }}
 
-      # Email Failure
+      # ----------------------------------------
+      # EMAIL FAILURE
+      # ----------------------------------------
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
