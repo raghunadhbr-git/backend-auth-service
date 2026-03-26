@@ -42,7 +42,7 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_STAGING }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
           subject: "🚀 PROD DEPLOY SUCCESS - ${{ env.TAG }}"
           to: ${{ secrets.MAIL_TO_STAGING }}
           cc: ${{ secrets.MAIL_CC_STAGING }}
