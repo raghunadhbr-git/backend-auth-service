@@ -1,0 +1,158 @@
+====================================================================
+FULL E-COMMERCE BACKEND – INTEGRATION TESTS
+SELLER + CUSTOMER FLOW
+(Auth Service + Product Service)
+LOCAL + LIVE (RENDER)
+====================================================================
+
+USAGE INSTRUCTIONS (IMPORTANT):
+1) Choose ENVIRONMENT (LOCAL or LIVE)
+2) Set BASE URLs (ONLY ONCE)
+3) Run commands TOP → BOTTOM
+4) After LOGIN, copy access_token
+5) Paste token into variables section
+6) Do NOT modify payloads
+
+====================================================================
+🔁 ENVIRONMENT SWITCH (CHOOSE ONE)
+====================================================================
+
+REM ==================================================
+REM 👉 LOCAL ENVIRONMENT (WHEN RUNNING LOCALLY)
+REM ==================================================
+REM SET AUTH_BASE_URL=http://127.0.0.1:5001
+REM SET PRODUCT_BASE_URL=http://127.0.0.1:5002
+
+REM ==================================================
+REM 👉 LIVE ENVIRONMENT (RENDER) ✅ ACTIVE
+REM ==================================================
+SET AUTH_BASE_URL=https://backend-auth-service-dkn7.onrender.com
+SET PRODUCT_BASE_URL=https://backend-product-service.onrender.com
+
+====================================================================
+COMMON VARIABLES (SET MANUALLY AFTER LOGIN / CREATE)
+====================================================================
+
+REM 🔑 Paste SELLER JWT token here after seller login
+SET SELLER_TOKEN=PASTE_SELLER_ACCESS_TOKEN_HERE
+
+REM 🔑 Paste CUSTOMER JWT token here after customer login
+SET CUSTOMER_TOKEN=PASTE_CUSTOMER_ACCESS_TOKEN_HERE
+
+REM 🆔 Paste product ID here after product creation
+SET PRODUCT_ID=PASTE_PRODUCT_ID_HERE
+
+====================================================================
+AUTH SERVICE
+====================================================================
+
+--------------------------------------------------
+1️⃣ AUTH SERVICE – HEALTH CHECK
+--------------------------------------------------
+curl %AUTH_BASE_URL%/api/v1/auth/
+
+--------------------------------------------------
+2️⃣ SELLER REGISTRATION
+--------------------------------------------------
+curl -X POST %AUTH_BASE_URL%/api/v1/auth/angularUser/register ^
+-H "Content-Type: application/json" ^
+-d "{\"email\":\"seller@test.com\",\"password\":\"seller123\",\"role\":\"seller\"}"
+
+--------------------------------------------------
+3️⃣ SELLER LOGIN (COPY access_token)
+--------------------------------------------------
+curl -X POST %AUTH_BASE_URL%/api/v1/auth/angularUser/login ^
+-H "Content-Type: application/json" ^
+-d "{\"email\":\"seller@test.com\",\"password\":\"seller123\"}"
+
+REM ⬆ COPY access_token
+REM ⬆ PASTE INTO SELLER_TOKEN ABOVE
+
+--------------------------------------------------
+4️⃣ SELLER PROFILE (JWT VERIFY)
+--------------------------------------------------
+curl -X GET %AUTH_BASE_URL%/api/v1/auth/profile ^
+-H "Authorization: Bearer %SELLER_TOKEN%"
+
+====================================================================
+PRODUCT SERVICE
+====================================================================
+
+--------------------------------------------------
+5️⃣ PRODUCT SERVICE – HEALTH CHECK
+--------------------------------------------------
+curl %PRODUCT_BASE_URL%/api/angularProduct/health
+
+--------------------------------------------------
+6️⃣ SELLER ADDS PRODUCT (JWT REQUIRED)
+--------------------------------------------------
+curl -X POST %PRODUCT_BASE_URL%/api/angularProduct/add ^
+-H "Authorization: Bearer %SELLER_TOKEN%" ^
+-H "Content-Type: application/json" ^
+-d "{\"name\":\"Laptop\",\"price\":55000,\"description\":\"Gaming laptop\"}"
+
+REM ⬆ COPY product ID FROM RESPONSE
+REM ⬆ PASTE INTO PRODUCT_ID ABOVE
+
+--------------------------------------------------
+7️⃣ SELLER VIEWS ALL PRODUCTS
+--------------------------------------------------
+curl -X GET %PRODUCT_BASE_URL%/api/angularProduct/get
+
+--------------------------------------------------
+8️⃣ SELLER VIEWS SINGLE PRODUCT
+--------------------------------------------------
+curl -X GET %PRODUCT_BASE_URL%/api/angularProduct/get/%PRODUCT_ID%
+
+--------------------------------------------------
+9️⃣ SELLER LOGOUT
+--------------------------------------------------
+curl -X POST %AUTH_BASE_URL%/api/v1/auth/logout ^
+-H "Authorization: Bearer %SELLER_TOKEN%"
+
+====================================================================
+CUSTOMER / USER FLOW
+====================================================================
+
+--------------------------------------------------
+🔟 CUSTOMER REGISTRATION
+--------------------------------------------------
+curl -X POST %AUTH_BASE_URL%/api/v1/auth/angularUser/register ^
+-H "Content-Type: application/json" ^
+-d "{\"email\":\"user@test.com\",\"password\":\"user123\",\"role\":\"user\"}"
+
+--------------------------------------------------
+1️⃣1️⃣ CUSTOMER LOGIN (COPY access_token)
+--------------------------------------------------
+curl -X POST %AUTH_BASE_URL%/api/v1/auth/angularUser/login ^
+-H "Content-Type: application/json" ^
+-d "{\"email\":\"user@test.com\",\"password\":\"user123\"}"
+
+REM ⬆ COPY access_token
+REM ⬆ PASTE INTO CUSTOMER_TOKEN ABOVE
+
+--------------------------------------------------
+1️⃣2️⃣ CUSTOMER PROFILE (JWT VERIFY)
+--------------------------------------------------
+curl -X GET %AUTH_BASE_URL%/api/v1/auth/profile ^
+-H "Authorization: Bearer %CUSTOMER_TOKEN%"
+
+--------------------------------------------------
+1️⃣3️⃣ CUSTOMER VIEWS ALL PRODUCTS
+--------------------------------------------------
+curl -X GET %PRODUCT_BASE_URL%/api/angularProduct/get
+
+--------------------------------------------------
+1️⃣4️⃣ CUSTOMER VIEWS SINGLE PRODUCT
+--------------------------------------------------
+curl -X GET %PRODUCT_BASE_URL%/api/angularProduct/get/%PRODUCT_ID%
+
+--------------------------------------------------
+1️⃣5️⃣ CUSTOMER LOGOUT
+--------------------------------------------------
+curl -X POST %AUTH_BASE_URL%/api/v1/auth/logout ^
+-H "Authorization: Bearer %CUSTOMER_TOKEN%"
+
+====================================================================
+END OF INTEGRATION TEST FILE
+====================================================================

@@ -1,0 +1,8 @@
+DATABASE_URL
+postgresql://postgres.ktwpojchloawedeiruvi:Raghunadh_1992@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require
+
+FLASK_ENV
+production
+
+JWT_SECRET_KEY
+9fA3xP@7Rk!2DqM8#ZbLw4^sC0N%YVJH

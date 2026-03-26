@@ -1,0 +1,74 @@
+# =====================================================
+# 🟦 AUTH SERVICE – FULL DB INSPECTION (FLASK + ALEMBIC)
+# =====================================================
+
+# 🔹 STEP 1: ACTIVATE VENV
+.\venv\Scripts\activate
+
+
+# 🔹 STEP 2: SET DATABASE_URL (SUPABASE)
+$env:DATABASE_URL="postgresql://postgres.ktwpojchloawedeiruvi:Raghunadh_1992@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
+
+
+# 🔹 STEP 3: RUN MIGRATIONS
+flask db upgrade
+
+
+# 🔹 STEP 4: CHECK CURRENT MIGRATION
+flask db current
+
+
+# 🔹 STEP 5: OPEN FLASK SHELL
+flask shell
+
+
+# ==============================
+# 🟨 INSIDE FLASK SHELL
+# ==============================
+
+from sqlalchemy import inspect, func
+from app.extensions import db
+from app.models.user import User
+from app.models.token_blacklist import TokenBlocklist
+
+inspect(db.engine).get_table_names()
+
+inspect(db.engine).get_columns("users")
+inspect(db.engine).get_columns("token_blocklist")
+
+User.query.count()
+TokenBlocklist.query.count()
+
+User.query.all()
+TokenBlocklist.query.all()
+
+User.query.limit(5).all()
+
+User.query.order_by(User.id.desc()).limit(5).all()
+User.query.order_by(User.id.asc()).limit(5).all()
+
+User.query.filter_by(email="test@example.com").first()
+User.query.filter_by(role="seller").all()
+User.query.filter_by(role="seller").count()
+
+db.session.query(User.email, User.role).all()
+
+db.session.query(func.count(User.id)).scalar()
+db.session.query(User.role, func.count(User.id)).group_by(User.role).all()
+
+TokenBlocklist.query.all()
+TokenBlocklist.query.filter_by(jti="your-jti-value").first()
+
+len(inspect(db.engine).get_columns("users"))
+len(inspect(db.engine).get_columns("token_blocklist"))
+
+db.session.execute("SELECT * FROM users LIMIT 5").fetchall()
+
+# ==============================
+# 🟨 EXIT FLASK SHELL
+# ==============================
+exit()
+
+
+# 🔹 STEP 6: REMOVE DATABASE_URL
+Remove-Item Env:DATABASE_URL

@@ -1,0 +1,10 @@
+# AUTH SERVICE – FINAL GIT COMMANDS
+
+git status
+
+git add .
+
+git commit -m "AUTH: JWT auth stable, seller/user flows verified" || \
+git commit --allow-empty -m "AUTH: No code changes, confirming stable auth service"
+
+git push origin main
