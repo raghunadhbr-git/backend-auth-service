@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# ========================================
+# 🚀 HOW TO RUN THIS SCRIPT (IMPORTANT)
+# ========================================
+# 1. Open Git Bash (NOT PowerShell)
+# 2. Navigate to project folder
+# 3. Run:
+#    chmod +x release.sh   (first time only)
+#    ./release.sh
+#
+# OR directly:
+#    bash release.sh
+#
+# ========================================
+# 🚀 RELEASE SCRIPT STARTS
+# ========================================
+
 echo "🚀 RELEASE STARTED"
 echo "--------------------------------"
 
@@ -17,7 +33,6 @@ echo "📌 Latest tag: $LATEST_TAG"
 
 echo "--------------------------------"
 
-# Check commits since last tag
 COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline)
 
 if [ -z "$COMMITS" ]; then
@@ -65,7 +80,6 @@ git push origin $NEW_TAG
 
 echo "✅ Tag pushed: $NEW_TAG"
 
-# Ask release creation
 read -p "📦 Create GitHub Release? (y/n): " CREATE_RELEASE
 
 if [ "$CREATE_RELEASE" == "y" ]; then
@@ -75,10 +89,18 @@ if [ "$CREATE_RELEASE" == "y" ]; then
       --notes "$COMMITS"
     echo "✅ Release created"
   else
-    echo "⚠️ gh CLI not installed, skipping release"
+    echo "⚠️ gh CLI not installed"
   fi
 else
   echo "⏭️ Release skipped"
 fi
 
 echo "🎯 DONE"
+
+# ========================================
+# 🧪 TEST CASES
+# ========================================
+# Case 1: No commits → exits safely
+# Case 2: Skip manually → exits cleanly
+# Case 3: Full run → tag + release created
+# ========================================

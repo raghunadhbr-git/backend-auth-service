@@ -1,15 +1,53 @@
-▶️ TEST CASES (LOCAL)
-________________________________________
-✅ Case 1: No commits
+========================================
+🚀 HOW TO RUN release.sh (VERY IMPORTANT)
+========================================
+
+1. Open Git Bash (NOT PowerShell)
+
+2. Go to project folder:
+   cd /your-project-path
+
+3. First time only:
+   chmod +x release.sh
+
+4. Run script:
+   ./release.sh
+
+Alternative:
+   bash release.sh
+
+----------------------------------------
+
+========================================
+🚀 RELEASE PROCESS
+========================================
+
+1. Switch to main branch
+2. Pull latest code
+3. Fetch tags
+4. Detect latest tag
+5. Show commits since last release
+6. Suggest next version
+7. Ask user input (or default)
+8. Confirm release
+9. Create and push tag
+10. Optionally create GitHub release
+
+----------------------------------------
+
+========================================
+🧪 TEST CASES
+========================================
+
+Case 1: No commits
 → shows "No changes"
 → asks continue?
 → press n → exits safely
-________________________________________
-✅ Case 2: Skip manually
-Proceed? n
+
+Case 2: Skip manually
+→ Proceed? n
 → exits cleanly
-________________________________________
-✅ Case 3: Full run
+
+Case 3: Full run
 → tag created
 → release created
-
