@@ -2,13 +2,18 @@ name: Release Tags
 
 on:
   workflow_dispatch:
+    inputs:
+      proceed:
+        description: "Type YES to continue (default NO)"
+        required: false
+        default: "NO"
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
     steps:
-      # ✅ FULL history (important)
+      # ✅ FULL history
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -53,10 +58,28 @@ jobs:
           NEW_TAG="v$MAJOR.$MINOR.$PATCH"
 
           echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
-          echo "💡 New tag: $NEW_TAG"
+
+          echo "--------------------------------"
+          echo "💡 Suggested New Tag: $NEW_TAG"
+          echo "--------------------------------"
 
       # ----------------------------------------
-      # STEP 4: Create Tag (SAFE)
+      # STEP 4: Confirm (LIKE VS CODE)
+      # ----------------------------------------
+      - name: Confirm Proceed
+        run: |
+          echo "--------------------------------"
+          echo "Proceed with release?"
+          echo "User input: ${{ github.event.inputs.proceed }}"
+          echo "--------------------------------"
+
+          if [ "${{ github.event.inputs.proceed }}" != "YES" ]; then
+            echo "❌ Skipping release (User did not type YES)"
+            exit 0
+          fi
+
+      # ----------------------------------------
+      # STEP 5: Create Tag
       # ----------------------------------------
       - name: Create Tag
         run: |
@@ -71,7 +94,7 @@ jobs:
           echo "✅ Tag created: $NEW_TAG"
 
       # ----------------------------------------
-      # STEP 5: Create Release
+      # STEP 6: Create Release
       # ----------------------------------------
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
