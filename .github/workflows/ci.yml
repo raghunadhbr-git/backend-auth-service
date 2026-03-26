@@ -3,8 +3,10 @@ name: CI - Build & Push Docker
 on:
   push:
     branches: ["*"]
-    tags: ["v*"]
-  pull_request:
+    tags:
+      - "v*"
+  create:   # ✅ IMPORTANT (fix missing tag trigger)
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,6 +14,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       # ----------------------------------------
       # METADATA
@@ -21,8 +25,19 @@ jobs:
           echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)" >> $GITHUB_ENV
+
           echo "IMAGE_SHA=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
           echo "IMAGE_LATEST=pythoncodelife/auth-service:latest" >> $GITHUB_ENV
+
+          # Handle tag safely
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          else
+            TAG=""
+          fi
+
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
       # ----------------------------------------
@@ -45,31 +60,29 @@ jobs:
         run: docker push $IMAGE_SHA
 
       # ----------------------------------------
-      # TAG + PUSH LATEST
+      # TAG & PUSH LATEST
       # ----------------------------------------
-      - name: Tag Latest
+      - name: Push Latest
         run: |
           docker tag $IMAGE_SHA $IMAGE_LATEST
           docker push $IMAGE_LATEST
 
       # ----------------------------------------
-      # TAG VERSION (IMPORTANT)
+      # TAG & PUSH VERSION (FIXED)
       # ----------------------------------------
-      - name: Tag Version (Release Tag)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Push Version Tag
+        if: env.TAG != ''
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "📌 Tag detected: $TAG"
 
           docker tag $IMAGE_SHA pythoncodelife/auth-service:$TAG
           docker push pythoncodelife/auth-service:$TAG
 
       # ----------------------------------------
-      # VERIFY IMAGE (NEW ADD)
+      # VERIFY IMAGE
       # ----------------------------------------
-      - name: Verify Image Exists
+      - name: Verify Image
         run: |
-          echo "Checking image..."
           docker manifest inspect $IMAGE_SHA || exit 1
 
       # ----------------------------------------
@@ -86,14 +99,13 @@ jobs:
           subject: "✅ CI SUCCESS"
           to: ${{ secrets.MAIL_TO_DEV }}
           cc: ${{ secrets.MAIL_CC_DEV }}
-          from: ${{ secrets.MAIL_USERNAME_DEV }}
           body: |
             CI SUCCESS 🚀
 
             Branch: ${{ env.BRANCH }}
             Commit: ${{ env.COMMIT }}
 
-            Images:
+            Docker Images:
             SHA: ${{ env.IMAGE_SHA }}
             LATEST: ${{ env.IMAGE_LATEST }}
             TAG: ${{ env.TAG }}
