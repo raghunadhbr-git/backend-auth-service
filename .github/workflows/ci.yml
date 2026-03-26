@@ -2,8 +2,13 @@ name: CI - Build & Push Docker
 
 on:
   push:
-    branches: ["*"]
-    tags: ["v*"]
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  create:
+    tags:
+      - "v*"
   pull_request:
 
 jobs:
@@ -16,10 +21,18 @@ jobs:
       # Metadata
       - name: Set Metadata
         run: |
-          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "IS_TAG=true" >> $GITHUB_ENV
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "IS_TAG=false" >> $GITHUB_ENV
+            echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          fi
 
       # Docker login
       - name: Docker Login
@@ -31,22 +44,22 @@ jobs:
         run: docker build -t $IMAGE .
 
       # Push SHA
-      - name: Push SHA
+      - name: Push SHA Image
         run: docker push $IMAGE
 
-      # Tag latest
+      # Push latest (only for branch builds)
       - name: Tag Latest
+        if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:latest
           docker push pythoncodelife/auth-service:latest
 
-      # Tag version (if tag)
+      # Push version (only for tags)
       - name: Tag Version
-        if: startsWith(github.ref, 'refs/tags/')
+        if: env.IS_TAG == 'true'
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          docker tag $IMAGE pythoncodelife/auth-service:$TAG
-          docker push pythoncodelife/auth-service:$TAG
+          docker tag $IMAGE pythoncodelife/auth-service:${TAG}
+          docker push pythoncodelife/auth-service:${TAG}
 
       # Email Success
       - name: Email Success
@@ -57,14 +70,14 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_DEV }}
           password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "✅ CI SUCCESS"
+          subject: "✅ CI SUCCESS 🚀"
           to: ${{ secrets.MAIL_TO_DEV }}
           cc: ${{ secrets.MAIL_CC_DEV }}
           from: ${{ secrets.MAIL_USERNAME_DEV }}
           body: |
             CI SUCCESS 🚀
 
-            Branch: ${{ env.BRANCH }}
+            Ref: ${{ env.REF }}
             Commit: ${{ env.COMMIT }}
 
             Docker Image:
