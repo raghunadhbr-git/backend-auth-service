@@ -1,0 +1,124 @@
+name: Release (Manual Interactive)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Enter tag (leave empty for auto increment)"
+        required: false
+      proceed:
+        description: "Type YES to proceed, anything else will skip"
+        required: false
+        default: "NO"
+      force:
+        description: "Force release even if no changes (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # ----------------------------------------
+      # Fetch Tags
+      # ----------------------------------------
+      - name: Fetch Tags
+        run: git fetch --tags
+
+      # ----------------------------------------
+      # Get Latest Tag
+      # ----------------------------------------
+      - name: Get Latest Tag
+        id: tag
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "📌 Latest tag: $LATEST_TAG"
+
+      # ----------------------------------------
+      # Show Changes
+      # ----------------------------------------
+      - name: Show Changes
+        run: |
+          COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline)
+          echo "COMMITS<<EOF" >> $GITHUB_ENV
+          echo "$COMMITS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          if [ -z "$COMMITS" ]; then
+            echo "⚠️ No new commits since last release"
+            echo "NO_CHANGES=true" >> $GITHUB_ENV
+          else
+            echo "📜 Changes:"
+            echo "$COMMITS"
+            echo "NO_CHANGES=false" >> $GITHUB_ENV
+          fi
+
+      # ----------------------------------------
+      # Decide Tag
+      # ----------------------------------------
+      - name: Compute Tag
+        run: |
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH+1))
+          AUTO_TAG="v$MAJOR.$MINOR.$PATCH"
+
+          if [ -z "${{ github.event.inputs.tag }}" ]; then
+            FINAL_TAG=$AUTO_TAG
+            echo "💡 Using auto tag: $FINAL_TAG"
+          else
+            FINAL_TAG=${{ github.event.inputs.tag }}
+            echo "📝 Using custom tag: $FINAL_TAG"
+          fi
+
+          echo "FINAL_TAG=$FINAL_TAG" >> $GITHUB_ENV
+
+      # ----------------------------------------
+      # Skip if no changes
+      # ----------------------------------------
+      - name: Skip if No Changes
+        if: env.NO_CHANGES == 'true' && github.event.inputs.force != 'true'
+        run: |
+          echo "⏭️ Skipping release (no changes)"
+          exit 0
+
+      # ----------------------------------------
+      # Confirm Proceed
+      # ----------------------------------------
+      - name: Confirm Proceed
+        run: |
+          if [ "${{ github.event.inputs.proceed }}" != "YES" ]; then
+            echo "❌ Skipped by user (proceed != YES)"
+            exit 0
+          fi
+
+      # ----------------------------------------
+      # Create Tag
+      # ----------------------------------------
+      - name: Create Tag
+        run: |
+          git tag $FINAL_TAG
+          git push origin $FINAL_TAG
+          echo "✅ Tag created: $FINAL_TAG"
+
+      # ----------------------------------------
+      # Create Release
+      # ----------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.FINAL_TAG }}
+          name: "🚀 Release ${{ env.FINAL_TAG }}"
+          body: |
+            Changes:
+            ${{ env.COMMITS }}
+
+      # ----------------------------------------
+      # Done
+      # ----------------------------------------
+      - name: Done
+        run: echo "🎯 Release Completed: $FINAL_TAG"
