@@ -1,28 +1,18 @@
-# ============================================
-# WORKFLOW NAME
-# ============================================
 name: CI - Build & Push Docker
 
-# ============================================
-# TRIGGERS
-# ============================================
 on:
-  # ✅ Runs on any branch push + tag push
   push:
     branches:
       - "**"
     tags:
-      - "v*"
+      - "v*"     # ✅ MAIN trigger for tags (CLI + workflows)
 
-  # ✅ Runs when tag is created
   create:
     tags:
-      - "v*"
+      - "v*"     # ✅ Backup for UI-created tags
 
-  # ✅ Pull request trigger
   pull_request:
 
-  # ✅ Manual trigger
   workflow_dispatch:
     inputs:
       environment:
@@ -30,26 +20,15 @@ on:
         required: false
         default: "dev"
 
-# ============================================
-# JOBS
-# ============================================
 jobs:
   build:
-    # ✅ Shows branch/tag in GitHub UI
     name: CI Build - ${{ github.ref_name }}
-
     runs-on: ubuntu-latest
 
     steps:
-      # ============================================
-      # STEP 1: Checkout
-      # ============================================
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ============================================
-      # STEP 2: Metadata Setup
-      # ============================================
       - name: Set Metadata
         run: |
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
@@ -57,7 +36,6 @@ jobs:
           echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-          # Detect TAG vs BRANCH
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "IS_TAG=true" >> $GITHUB_ENV
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
@@ -66,14 +44,9 @@ jobs:
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           fi
 
-      # ============================================
-      # STEP 3: Debug / Visibility Logs
-      # ============================================
       - name: Show Execution Info
         run: |
-          echo "========================================="
-          echo "🚀 CI PIPELINE TRIGGERED"
-          echo "-----------------------------------------"
+          echo "🚀 CI TRIGGERED"
           echo "Ref: $REF"
           echo "Commit: $COMMIT"
 
@@ -85,51 +58,30 @@ jobs:
             echo "Branch: $BRANCH"
           fi
 
-          echo "Docker Image: $IMAGE"
-          echo "========================================="
-
-      # ============================================
-      # STEP 4: Docker Login
-      # ============================================
       - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login \
           -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" \
           --password-stdin
 
-      # ============================================
-      # STEP 5: Build Docker Image
-      # ============================================
       - name: Build Image
         run: docker build -t $IMAGE .
 
-      # ============================================
-      # STEP 6: Push SHA Image (Always)
-      # ============================================
       - name: Push SHA Image
         run: docker push $IMAGE
 
-      # ============================================
-      # STEP 7: Tag as latest (ONLY for branch builds)
-      # ============================================
       - name: Tag Latest
         if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:latest
           docker push pythoncodelife/auth-service:latest
 
-      # ============================================
-      # STEP 8: Tag with version (ONLY for tag builds)
-      # ============================================
       - name: Tag Version
         if: env.IS_TAG == 'true'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:${TAG}
           docker push pythoncodelife/auth-service:${TAG}
 
-      # ============================================
-      # STEP 9: Email Success
-      # ============================================
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -154,9 +106,6 @@ jobs:
             URL:
             ${{ env.URL }}
 
-      # ============================================
-      # STEP 10: Email Failure
-      # ============================================
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
