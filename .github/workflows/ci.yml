@@ -1,67 +1,121 @@
+# ============================================
+# WORKFLOW NAME (shown in GitHub Actions UI)
+# ============================================
 name: CI - Build & Push Docker
 
+# ============================================
+# TRIGGERS (WHEN WORKFLOW SHOULD RUN)
+# ============================================
 on:
+  # ✅ Automatic trigger on any push (all branches + tags)
   push:
     branches:
-      - "**"
+      - "**"          # all branches
     tags:
-      - "v*"
+      - "v*"          # version tags like v1.0.0
+
+  # ✅ Trigger when tag is created
   create:
     tags:
       - "v*"
+
+  # ✅ Trigger on Pull Requests
   pull_request:
 
+  # ✅ Manual trigger (Run workflow button in GitHub UI)
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment (dev/staging/prod)"
+        required: false
+        default: "dev"
+
+# ============================================
+# JOBS SECTION
+# ============================================
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # GitHub runner (Linux machine)
 
     steps:
-      - uses: actions/checkout@v3
+      # ============================================
+      # STEP 1: Checkout Code
+      # ============================================
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      # Metadata
+      # ============================================
+      # STEP 2: Set Metadata (IMPORTANT)
+      # ============================================
       - name: Set Metadata
         run: |
+          # Store Git reference (branch/tag)
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
+
+          # Store full commit SHA
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
+
+          # Docker image with SHA tag (immutable)
           echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
+
+          # Deployment URL (for email reference)
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
+          # Check if this is a TAG build or BRANCH build
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "IS_TAG=true" >> $GITHUB_ENV
+
+            # Extract tag name (e.g., v1.0.0)
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           else
             echo "IS_TAG=false" >> $GITHUB_ENV
+
+            # Extract branch name (e.g., main/dev)
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           fi
 
-      # Docker login
+      # ============================================
+      # STEP 3: Login to DockerHub
+      # ============================================
       - name: Docker Login
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" --password-stdin
+          echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" \
+          --password-stdin
 
-      # Build
+      # ============================================
+      # STEP 4: Build Docker Image
+      # ============================================
       - name: Build Image
         run: docker build -t $IMAGE .
 
-      # Push SHA
+      # ============================================
+      # STEP 5: Push SHA-based Image (always)
+      # ============================================
       - name: Push SHA Image
         run: docker push $IMAGE
 
-      # Push latest (only for branch builds)
+      # ============================================
+      # STEP 6: Tag as 'latest' (ONLY for branch builds)
+      # ============================================
       - name: Tag Latest
         if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:latest
           docker push pythoncodelife/auth-service:latest
 
-      # Push version (only for tags)
+      # ============================================
+      # STEP 7: Tag with version (ONLY for tag builds)
+      # ============================================
       - name: Tag Version
         if: env.IS_TAG == 'true'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:${TAG}
           docker push pythoncodelife/auth-service:${TAG}
 
-      # Email Success
+      # ============================================
+      # STEP 8: Email on SUCCESS
+      # ============================================
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -86,7 +140,9 @@ jobs:
             URL:
             ${{ env.URL }}
 
-      # Email Failure
+      # ============================================
+      # STEP 9: Email on FAILURE
+      # ============================================
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
