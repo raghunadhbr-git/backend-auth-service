@@ -1,28 +1,28 @@
 # ============================================
-# WORKFLOW NAME (shown in GitHub Actions UI)
+# WORKFLOW NAME
 # ============================================
 name: CI - Build & Push Docker
 
 # ============================================
-# TRIGGERS (WHEN WORKFLOW SHOULD RUN)
+# TRIGGERS
 # ============================================
 on:
-  # ✅ Automatic trigger on any push (all branches + tags)
+  # ✅ Runs on any branch push + tag push
   push:
     branches:
-      - "**"          # all branches
+      - "**"
     tags:
-      - "v*"          # version tags like v1.0.0
+      - "v*"
 
-  # ✅ Trigger when tag is created
+  # ✅ Runs when tag is created
   create:
     tags:
       - "v*"
 
-  # ✅ Trigger on Pull Requests
+  # ✅ Pull request trigger
   pull_request:
 
-  # ✅ Manual trigger (Run workflow button in GitHub UI)
+  # ✅ Manual trigger
   workflow_dispatch:
     inputs:
       environment:
@@ -31,51 +31,65 @@ on:
         default: "dev"
 
 # ============================================
-# JOBS SECTION
+# JOBS
 # ============================================
 jobs:
   build:
-    runs-on: ubuntu-latest   # GitHub runner (Linux machine)
+    # ✅ Shows branch/tag in GitHub UI
+    name: CI Build - ${{ github.ref_name }}
+
+    runs-on: ubuntu-latest
 
     steps:
       # ============================================
-      # STEP 1: Checkout Code
+      # STEP 1: Checkout
       # ============================================
       - name: Checkout Code
         uses: actions/checkout@v3
 
       # ============================================
-      # STEP 2: Set Metadata (IMPORTANT)
+      # STEP 2: Metadata Setup
       # ============================================
       - name: Set Metadata
         run: |
-          # Store Git reference (branch/tag)
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
-
-          # Store full commit SHA
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
-
-          # Docker image with SHA tag (immutable)
           echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
-
-          # Deployment URL (for email reference)
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-          # Check if this is a TAG build or BRANCH build
+          # Detect TAG vs BRANCH
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "IS_TAG=true" >> $GITHUB_ENV
-
-            # Extract tag name (e.g., v1.0.0)
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
           else
             echo "IS_TAG=false" >> $GITHUB_ENV
-
-            # Extract branch name (e.g., main/dev)
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           fi
 
       # ============================================
-      # STEP 3: Login to DockerHub
+      # STEP 3: Debug / Visibility Logs
+      # ============================================
+      - name: Show Execution Info
+        run: |
+          echo "========================================="
+          echo "🚀 CI PIPELINE TRIGGERED"
+          echo "-----------------------------------------"
+          echo "Ref: $REF"
+          echo "Commit: $COMMIT"
+
+          if [ "$IS_TAG" = "true" ]; then
+            echo "Type: TAG BUILD"
+            echo "Tag: $TAG"
+          else
+            echo "Type: BRANCH BUILD"
+            echo "Branch: $BRANCH"
+          fi
+
+          echo "Docker Image: $IMAGE"
+          echo "========================================="
+
+      # ============================================
+      # STEP 4: Docker Login
       # ============================================
       - name: Docker Login
         run: |
@@ -84,19 +98,19 @@ jobs:
           --password-stdin
 
       # ============================================
-      # STEP 4: Build Docker Image
+      # STEP 5: Build Docker Image
       # ============================================
       - name: Build Image
         run: docker build -t $IMAGE .
 
       # ============================================
-      # STEP 5: Push SHA-based Image (always)
+      # STEP 6: Push SHA Image (Always)
       # ============================================
       - name: Push SHA Image
         run: docker push $IMAGE
 
       # ============================================
-      # STEP 6: Tag as 'latest' (ONLY for branch builds)
+      # STEP 7: Tag as latest (ONLY for branch builds)
       # ============================================
       - name: Tag Latest
         if: env.IS_TAG == 'false'
@@ -105,7 +119,7 @@ jobs:
           docker push pythoncodelife/auth-service:latest
 
       # ============================================
-      # STEP 7: Tag with version (ONLY for tag builds)
+      # STEP 8: Tag with version (ONLY for tag builds)
       # ============================================
       - name: Tag Version
         if: env.IS_TAG == 'true'
@@ -114,7 +128,7 @@ jobs:
           docker push pythoncodelife/auth-service:${TAG}
 
       # ============================================
-      # STEP 8: Email on SUCCESS
+      # STEP 9: Email Success
       # ============================================
       - name: Email Success
         if: success()
@@ -141,7 +155,7 @@ jobs:
             ${{ env.URL }}
 
       # ============================================
-      # STEP 9: Email on FAILURE
+      # STEP 10: Email Failure
       # ============================================
       - name: Email Failure
         if: failure()
