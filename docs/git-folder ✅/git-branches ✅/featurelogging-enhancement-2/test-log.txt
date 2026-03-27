@@ -1,0 +1,22 @@
+# Go to main and update
+git checkout main
+git pull origin main
+
+# Create and switch to new feature branch
+git checkout -b feature/random-test-flow
+
+# Create first file
+echo "First test file" > file1.txt
+
+# Add, commit, push (first push)
+git add file1.txt
+git commit -m "feat: add first test file"
+git push -u origin feature/random-test-flow
+
+# Create second file
+echo "Second test file" > file2.txt
+
+# Add, commit, push (second push)
+git add file2.txt
+git commit -m "feat: add second test file"
+git push
