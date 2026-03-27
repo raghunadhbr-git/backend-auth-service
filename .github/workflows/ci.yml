@@ -2,53 +2,86 @@ name: CI - Build & Push Docker
 
 on:
   push:
-    branches: ["*"]
-    tags: ["v*"]
+    branches:
+      - "**"
+    tags:
+      - "v*"     # ✅ MAIN trigger for tags (CLI + workflows)
+
+  create:
+    tags:
+      - "v*"     # ✅ Backup for UI-created tags
+
   pull_request:
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select environment (dev/staging/prod)"
+        required: false
+        default: "dev"
 
 jobs:
   build:
+    name: CI Build - ${{ github.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-      # Metadata
       - name: Set Metadata
         run: |
-          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
           echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-      # Docker login
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "IS_TAG=true" >> $GITHUB_ENV
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "IS_TAG=false" >> $GITHUB_ENV
+            echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          fi
+
+      - name: Show Execution Info
+        run: |
+          echo "🚀 CI TRIGGERED"
+          echo "Ref: $REF"
+          echo "Commit: $COMMIT"
+
+          if [ "$IS_TAG" = "true" ]; then
+            echo "Type: TAG BUILD"
+            echo "Tag: $TAG"
+          else
+            echo "Type: BRANCH BUILD"
+            echo "Branch: $BRANCH"
+          fi
+
       - name: Docker Login
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" --password-stdin
+          echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" \
+          --password-stdin
 
-      # Build
       - name: Build Image
         run: docker build -t $IMAGE .
 
-      # Push SHA
-      - name: Push SHA
+      - name: Push SHA Image
         run: docker push $IMAGE
 
-      # Tag latest
       - name: Tag Latest
+        if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:latest
           docker push pythoncodelife/auth-service:latest
 
-      # Tag version (if tag)
       - name: Tag Version
-        if: startsWith(github.ref, 'refs/tags/')
+        if: env.IS_TAG == 'true'
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          docker tag $IMAGE pythoncodelife/auth-service:$TAG
-          docker push pythoncodelife/auth-service:$TAG
+          docker tag $IMAGE pythoncodelife/auth-service:${TAG}
+          docker push pythoncodelife/auth-service:${TAG}
 
-      # Email Success
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -57,14 +90,14 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_DEV }}
           password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "✅ CI SUCCESS"
+          subject: "✅ CI SUCCESS 🚀"
           to: ${{ secrets.MAIL_TO_DEV }}
           cc: ${{ secrets.MAIL_CC_DEV }}
           from: ${{ secrets.MAIL_USERNAME_DEV }}
           body: |
             CI SUCCESS 🚀
 
-            Branch: ${{ env.BRANCH }}
+            Ref: ${{ env.REF }}
             Commit: ${{ env.COMMIT }}
 
             Docker Image:
@@ -73,7 +106,6 @@ jobs:
             URL:
             ${{ env.URL }}
 
-      # Email Failure
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3

@@ -1,0 +1,89 @@
+name: Release Tags (Manual Controlled)
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------
+      # Checkout full repo
+      # ----------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # ----------------------------------------
+      # Fetch tags
+      # ----------------------------------------
+      - name: Fetch Tags
+        run: git fetch --tags
+
+      # ----------------------------------------
+      # Get latest tag
+      # ----------------------------------------
+      - name: Get Latest Tag
+        run: |
+          LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.0.0"
+          fi
+
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "📌 Latest tag: $LATEST_TAG"
+
+      # ----------------------------------------
+      # Increment version
+      # ----------------------------------------
+      - name: Increment Version
+        run: |
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          PATCH=$((PATCH+1))
+
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "🚀 New tag: $NEW_TAG"
+
+      # ----------------------------------------
+      # Create & Push Tag (CRITICAL PART)
+      # ----------------------------------------
+      - name: Create and Push Tag
+        env:
+          TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "⚠️ Tag already exists. Skipping..."
+            exit 0
+          fi
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git tag $NEW_TAG
+
+          # 🔥 IMPORTANT → use PAT to trigger CI
+          git push https://$TOKEN@github.com/${{ github.repository }} $NEW_TAG
+
+          echo "✅ Tag pushed: $NEW_TAG"
+
+      # ----------------------------------------
+      # Create Release (optional)
+      # ----------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          name: "🚀 Release ${{ env.NEW_TAG }}"
+          body: |
+            Automated release via GitHub Actions
+
+      - name: Done
+        run: echo "🎯 Release completed & CI should trigger 🚀"

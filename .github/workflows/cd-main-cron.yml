@@ -1,26 +1,85 @@
-name: CD - Cron Latest Tag
+name: 🚀 CD - Cron Latest Tag
 
 on:
-  schedule:
-    - cron: "30 20 * * *"
   workflow_dispatch:
+  schedule:
+    - cron: "30 20 * * *"   # 2 AM IST
 
 jobs:
-  deploy: 
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - run: git fetch --tags
+      # Checkout full repo
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
+      # Fetch tags
+      - name: Fetch Tags
+        run: git fetch --tags
+
+      # Get latest tag + commit
       - name: Get Latest Tag
         run: |
-          TAG=$(git describe --tags $(git rev-list --tags --max-count=1))
+          TAG=$(git tag --sort=-v:refname | head -n 1)
+
           echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "IMAGE=pythoncodelife/auth-service:$TAG" >> $GITHUB_ENV
+          echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
 
-      - run: docker pull pythoncodelife/auth-service:${{ env.TAG }}
+          COMMIT=$(git rev-list -n 1 $TAG)
+          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
 
+          echo "Latest tag: $TAG"
+          echo "Commit: $COMMIT"
+
+      # Pull docker image
+      - name: Pull Image
+        run: docker pull $IMAGE
+
+      # Deploy
       - name: Deploy
         run: |
-          curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_PROJECT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
+          curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_ENVIRONMENT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
           -H "Authorization: Bearer ${{ secrets.RAILWAY_API_TOKEN_STAGING }}"
+
+      # Wait
+      - name: Wait
+        run: sleep 30
+
+      # Health check
+      - name: Health Check
+        run: |
+          RESPONSE=$(curl -s $URL)
+          echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
+
+      # Email
+      - name: Email Success
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_STAGING }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          subject: "🚀 PROD DEPLOY SUCCESS - ${{ env.TAG }}"
+          to: ${{ secrets.MAIL_TO_STAGING }}
+          cc: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_STAGING }}
+          body: |
+            PROD DEPLOY SUCCESS 🚀
+
+            Tag: ${{ env.TAG }}
+            Commit: ${{ env.COMMIT }}
+            Image: ${{ env.IMAGE }}
+
+            URL:
+            ${{ env.URL }}
+
+            Response:
+            ${{ env.RESPONSE }}
+
+      - name: Done
+        run: echo "Deployment completed for ${{ env.TAG }}"
