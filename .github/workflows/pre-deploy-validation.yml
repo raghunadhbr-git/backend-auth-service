@@ -8,25 +8,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ==========================================
+      # START
+      # ==========================================
       - name: 🚀 Start Validation
         run: |
           echo "=========================================="
           echo "🧠 PRE-DEPLOY VALIDATION STARTED"
           echo "=========================================="
 
+      # ==========================================
+      # CHECKOUT
+      # ==========================================
       - name: 📥 Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
+      # ==========================================
+      # FETCH TAGS
+      # ==========================================
       - name: 🔄 Fetch Tags
         run: |
           git fetch --tags
           echo "✅ Tags fetched successfully"
 
+      # ==========================================
+      # GET TAG + COMMIT
+      # ==========================================
       - name: 🔍 Get Latest Tag + Commit Info
         run: |
           TAG=$(git tag --sort=-v:refname | head -n 1)
+
+          if [ -z "$TAG" ]; then
+            echo "❌ ERROR: No tags found in repository"
+            exit 1
+          fi
+
           echo "TAG=$TAG" >> $GITHUB_ENV
 
           COMMIT=$(git rev-list -n 1 $TAG)
@@ -57,33 +75,44 @@ jobs:
           echo "📅 DATE      : $DATE"
           echo "=========================================="
 
+      # ==========================================
+      # TIME CHECK
+      # ==========================================
       - name: ⏱️ Calculate Time Difference
         run: |
           NOW=$(date +%s)
-          COMMIT_TIME=$(date -d "$DATE" +%s)
-          DIFF=$((NOW - COMMIT_TIME))
+          COMMIT_TIME=$(date --date="$DATE" +%s 2>/dev/null || echo 0)
 
-          MIN=$((DIFF / 60))
-          HOUR=$((DIFF / 3600))
-          DAY=$((DIFF / 86400))
-
-          echo "=========================================="
-          echo "⏱️ DEPLOYMENT FRESHNESS CHECK"
-          echo "------------------------------------------"
-
-          if [ $MIN -lt 60 ]; then
-            echo "🕒 Pushed: $MIN minutes ago"
-          elif [ $HOUR -lt 24 ]; then
-            echo "🕒 Pushed: $HOUR hours ago"
+          if [ "$COMMIT_TIME" = "0" ]; then
+            echo "⚠️ Could not parse commit date"
           else
-            echo "🕒 Pushed: $DAY days ago"
+            DIFF=$((NOW - COMMIT_TIME))
+            MIN=$((DIFF / 60))
+            HOUR=$((DIFF / 3600))
+            DAY=$((DIFF / 86400))
+
+            echo "=========================================="
+            echo "⏱️ DEPLOYMENT FRESHNESS CHECK"
+            echo "------------------------------------------"
+
+            if [ $MIN -lt 60 ]; then
+              echo "🕒 Pushed: $MIN minutes ago"
+            elif [ $HOUR -lt 24 ]; then
+              echo "🕒 Pushed: $HOUR hours ago"
+            else
+              echo "🕒 Pushed: $DAY days ago"
+            fi
+
+            echo "=========================================="
           fi
 
-          echo "=========================================="
-
+      # ==========================================
+      # DOCKER CHECK
+      # ==========================================
       - name: 🐳 Check Docker Image Exists
         run: |
           IMAGE="pythoncodelife/auth-service:$TAG"
+
           echo "=========================================="
           echo "🐳 DOCKER IMAGE VALIDATION"
           echo "------------------------------------------"
@@ -96,12 +125,15 @@ jobs:
             echo "✅ IMAGE FOUND in Docker Hub"
             echo "READY=true" >> $GITHUB_ENV
           else
-            echo "❌ IMAGE NOT FOUND"
+            echo "⚠️ Image check failed (maybe not pushed yet or API issue)"
             echo "READY=false" >> $GITHUB_ENV
           fi
 
           echo "=========================================="
 
+      # ==========================================
+      # FINAL DECISION
+      # ==========================================
       - name: 🧠 Final Decision
         run: |
           echo "=========================================="
@@ -109,9 +141,9 @@ jobs:
           echo "------------------------------------------"
 
           if [ "$READY" = "true" ]; then
-            echo "✅ SAFE TO DEPLOY"
+            echo "✅ SAFE TO DEPLOY 🚀"
             echo "🎯 Latest tag is ready and image exists"
-            echo "🚀 You can proceed with CD deployment"
+            echo "👉 You can now trigger CD workflow safely"
           else
             echo "❌ NOT SAFE TO DEPLOY"
             echo "⚠️ Docker image not available yet"
