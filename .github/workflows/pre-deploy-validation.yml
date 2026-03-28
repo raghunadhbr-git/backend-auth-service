@@ -1,4 +1,3 @@
-
 name: 🧠 Pre-Deploy Validation
 
 on:
@@ -9,15 +8,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: 🚀 Start Validation
+        run: |
+          echo "=========================================="
+          echo "🧠 PRE-DEPLOY VALIDATION STARTED"
+          echo "=========================================="
+
+      - name: 📥 Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: Fetch Tags
-        run: git fetch --tags
+      - name: 🔄 Fetch Tags
+        run: |
+          git fetch --tags
+          echo "✅ Tags fetched successfully"
 
-      - name: Get Latest Tag + Commit Info
+      - name: 🔍 Get Latest Tag + Commit Info
         run: |
           TAG=$(git tag --sort=-v:refname | head -n 1)
           echo "TAG=$TAG" >> $GITHUB_ENV
@@ -25,18 +32,32 @@ jobs:
           COMMIT=$(git rev-list -n 1 $TAG)
           echo "COMMIT=$COMMIT" >> $GITHUB_ENV
 
-          MESSAGE=$(git log -1 --pretty=%B $COMMIT)
+          MESSAGE=$(git log -1 --pretty=%s $COMMIT)
           echo "MESSAGE=$MESSAGE" >> $GITHUB_ENV
+
+          DESC=$(git log -1 --pretty=%b $COMMIT)
+          echo "DESC=$DESC" >> $GITHUB_ENV
 
           DATE=$(git log -1 --format=%cd --date=iso $COMMIT)
           echo "DATE=$DATE" >> $GITHUB_ENV
 
-          echo "📌 Latest Tag: $TAG"
-          echo "🔗 Commit SHA: $COMMIT"
-          echo "📝 Message: $MESSAGE"
-          echo "📅 Date: $DATE"
+          echo "=========================================="
+          echo "📌 LATEST TAG DETECTED"
+          echo "------------------------------------------"
+          echo "🏷️  TAG       : $TAG"
+          echo "🔗 COMMIT    : $COMMIT"
+          echo "📝 MESSAGE   : $MESSAGE"
 
-      - name: Calculate Time Difference
+          if [ -n "$DESC" ]; then
+            echo "📄 DESC      : $DESC"
+          else
+            echo "📄 DESC      : (No description)"
+          fi
+
+          echo "📅 DATE      : $DATE"
+          echo "=========================================="
+
+      - name: ⏱️ Calculate Time Difference
         run: |
           NOW=$(date +%s)
           COMMIT_TIME=$(date -d "$DATE" +%s)
@@ -46,35 +67,57 @@ jobs:
           HOUR=$((DIFF / 3600))
           DAY=$((DIFF / 86400))
 
+          echo "=========================================="
+          echo "⏱️ DEPLOYMENT FRESHNESS CHECK"
+          echo "------------------------------------------"
+
           if [ $MIN -lt 60 ]; then
-            echo "⏱️ Pushed: $MIN minutes ago"
+            echo "🕒 Pushed: $MIN minutes ago"
           elif [ $HOUR -lt 24 ]; then
-            echo "⏱️ Pushed: $HOUR hours ago"
+            echo "🕒 Pushed: $HOUR hours ago"
           else
-            echo "⏱️ Pushed: $DAY days ago"
+            echo "🕒 Pushed: $DAY days ago"
           fi
 
-      - name: Check Docker Image Exists
+          echo "=========================================="
+
+      - name: 🐳 Check Docker Image Exists
         run: |
           IMAGE="pythoncodelife/auth-service:$TAG"
-          echo "📦 Checking Docker Image: $IMAGE"
+          echo "=========================================="
+          echo "🐳 DOCKER IMAGE VALIDATION"
+          echo "------------------------------------------"
+          echo "📦 IMAGE: $IMAGE"
 
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
           https://hub.docker.com/v2/repositories/pythoncodelife/auth-service/tags/$TAG)
 
           if [ "$STATUS" = "200" ]; then
-            echo "✅ Image FOUND in Docker Hub"
+            echo "✅ IMAGE FOUND in Docker Hub"
             echo "READY=true" >> $GITHUB_ENV
           else
-            echo "❌ Image NOT FOUND"
+            echo "❌ IMAGE NOT FOUND"
             echo "READY=false" >> $GITHUB_ENV
           fi
 
-      - name: Final Decision
+          echo "=========================================="
+
+      - name: 🧠 Final Decision
         run: |
+          echo "=========================================="
+          echo "🚀 FINAL DEPLOYMENT DECISION"
+          echo "------------------------------------------"
+
           if [ "$READY" = "true" ]; then
-            echo "🚀 STATUS: SAFE TO DEPLOY"
+            echo "✅ SAFE TO DEPLOY"
+            echo "🎯 Latest tag is ready and image exists"
+            echo "🚀 You can proceed with CD deployment"
           else
-            echo "⚠️ STATUS: DO NOT DEPLOY"
-            echo "Wait for CI to finish building image"
+            echo "❌ NOT SAFE TO DEPLOY"
+            echo "⚠️ Docker image not available yet"
+            echo "⏳ Wait for CI to complete"
           fi
+
+          echo "=========================================="
+          echo "🏁 VALIDATION COMPLETED"
+          echo "=========================================="
