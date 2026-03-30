@@ -1,0 +1,784 @@
+# =====================================================
+# 🟦 AUTH ROUTES – API LAYER (REQUEST/RESPONSE)
+# =====================================================
+
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import (
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    get_jwt
+)
+
+from ..services.auth_service import register_user
+from ..extensions import db
+from ..models.token_blacklist import TokenBlocklist
+from ..models.user import User
+
+auth_bp = Blueprint("auth", __name__)
+
+
+# ------------------------------------------------
+# HEALTH CHECK
+# ------------------------------------------------
+@auth_bp.get("/")
+def health():
+    return jsonify({"status": "auth-service UP"}), 200
+
+
+# ------------------------------------------------
+# REGISTER (USER / SELLER)
+# ------------------------------------------------
+@auth_bp.post("/angularUser/register")
+def angular_register():
+    """
+    Expected Payload:
+    {
+      "email": "user@test.com",
+      "password": "12345",
+      "role": "user"
+    }
+    """
+
+    data = request.get_json() or {}   # 🔴 DEBUG: check incoming payload from Angular/Postman
+
+    email = data.get("email")         # 🔴 DEBUG: should not be None
+    password = data.get("password")   # 🔴 DEBUG: should not be None
+    role = data.get("role", "user")   # 🔴 DEBUG: default = "user"
+
+    # Basic validation
+    if not email or not password:
+        return jsonify({"message": "email and password required"}), 400
+
+    # Call service (DB insert + duplicate handling)
+    resp, status = register_user(email, password, role)   # 🔴 DEBUG: F11 to step into service
+
+    if status != 201:
+        # 🔴 DEBUG: duplicate user case → expect 400 + "User already exists"
+        return jsonify(resp), status
+
+    current_app.logger.info(
+        f"User registered email={email}, role={role}"
+    )
+
+    return jsonify(resp), 201
+
+
+# ------------------------------------------------
+# LOGIN
+# ------------------------------------------------
+@auth_bp.post("/angularUser/login")
+def angular_login():
+    """
+    Expected Payload:
+    {
+      "email": "user@test.com",
+      "password": "12345"
+    }
+    """
+
+    data = request.get_json() or {}   # 🔴 DEBUG: check login payload
+
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"message": "email and password required"}), 400
+
+    # Fetch user from DB
+    user = User.query.filter_by(email=email).first()   # 🔴 DEBUG: check if user exists
+
+    # Validate credentials
+    if not user or not user.check_password(password):   # 🔴 DEBUG: wrong password / user not found
+        current_app.logger.warning(
+            f"Invalid login attempt email={email}"
+        )
+        return jsonify({"message": "Invalid email or password"}), 401
+
+    # Generate JWT token
+    token = create_access_token(identity=str(user.id))   # 🔴 DEBUG: check token value
+
+    return jsonify({
+        "access_token": token,
+        "userId": user.id,
+        "role": user.role
+    }), 200
+
+
+# ------------------------------------------------
+# PROFILE (PROTECTED ROUTE)
+# ------------------------------------------------
+@auth_bp.get("/profile")
+@jwt_required()
+def profile():
+    """
+    Header Required:
+    Authorization: Bearer <JWT_TOKEN>
+    """
+
+    user_id = get_jwt_identity()   # 🔴 DEBUG: should return logged-in user id
+
+    return jsonify({"user_id": user_id}), 200
+
+
+# ------------------------------------------------
+# LOGOUT (TOKEN BLACKLIST)
+# ------------------------------------------------
+@auth_bp.post("/logout")
+@jwt_required()
+def logout():
+    """
+    Header Required:
+    Authorization: Bearer <JWT_TOKEN>
+    """
+
+    jti = get_jwt()["jti"]   # 🔴 DEBUG: unique token id
+
+    db.session.add(TokenBlocklist(jti=jti))   # 🔴 DEBUG: ensure DB insert
+    db.session.commit()
+
+    return jsonify({"message": "Logged out successfully"}), 200
+
+
+# =====================================================
+# 🔧 DEBUG STEPS (QUICK REFERENCE)
+# =====================================================
+
+# 1. Press F5 → Start Debugging
+# 2. Trigger API from Angular / Postman
+# 3. Execution pauses at 🔴 lines
+# 4. Use:
+#    - F10 → Step Over (line by line)
+#    - F11 → Step Into (go inside service)
+#    - Shift + F5 → Stop Debugging
+
+# Focus while debugging:
+# ✔ Request payload (data)
+# ✔ DB queries (user fetch / insert)
+# ✔ Conditions (if checks)
+# ✔ Token generation
+
+
+app\api\auth_routes.py
+
+
+"""
+This file simply exposes the model classes
+so that Flask-Migrate (Alembic) can discover them.
+"""
+
+from .user import User
+from .token_blacklist import TokenBlocklist
+
+__all__ = ["User", "TokenBlocklist"]
+
+
+app\models\__init__.py
+
+from ..extensions import db
+
+class TokenBlocklist(db.Model):
+    __tablename__ = "token_blocklist"
+
+    id = db.Column(db.Integer, primary_key=True)
+    jti = db.Column(db.String(200), nullable=False, index=True)
+
+    def __repr__(self):
+        return f"<TokenBlocklist jti={self.jti}>"
+
+
+app\models\token_blacklist.py
+
+from ..extensions import db
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+
+    # NEW FIELD (Angular alignment)
+    role = db.Column(db.String(20), default="user")  # user | seller
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def __repr__(self):
+        return f"<User {self.email} ({self.role})>"
+
+
+app\models\user.py
+
+# =====================================================
+# 🟦 AUTH SERVICE – BUSINESS LOGIC + DB HANDLING
+# =====================================================
+
+from flask import current_app
+from sqlalchemy.exc import IntegrityError
+from app.models.user import User
+from app.extensions import db
+
+
+def register_user(email: str, password: str, role: str = "user"):
+    """
+    Handles:
+    - User creation
+    - Password hashing
+    - Duplicate handling (race condition safe)
+    """
+
+    try:
+        user = User(
+            email=email,
+            role=role
+        )
+
+        # Secure password hashing
+        user.set_password(password)
+
+        db.session.add(user)
+        db.session.commit()
+
+        current_app.logger.info(
+            f"User created id={user.id}, email={user.email}"
+        )
+
+        return {
+            "message": "User registered successfully",
+            "role": user.role
+        }, 201
+
+    except IntegrityError:
+        # Handles duplicate email / race condition
+        db.session.rollback()
+
+        return {
+            "message": "User already exists"
+        }, 400
+
+app\services\auth_service.py
+
+import os
+import logging
+from logging.handlers import TimedRotatingFileHandler
+
+from flask import Flask, jsonify
+from .config import Config
+from .extensions import db, migrate, jwt, cors
+
+# Import models for Alembic
+from .models.user import User
+from .models.token_blacklist import TokenBlocklist
+
+
+def create_app(testing: bool = False):
+    app = Flask(__name__)
+
+    # --------------------------
+    # Base config
+    # --------------------------
+    app.config.from_object(Config)
+
+    # --------------------------
+    # Testing override
+    # --------------------------
+    if testing:
+        app.config["TESTING"] = True
+        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+        app.config["JWT_SECRET_KEY"] = "test-secret"
+
+    # --------------------------
+    # Extensions
+    # --------------------------
+    cors.init_app(app)
+
+    # ✅ DB should be initialized in real runtime (Railway / Docker)
+    db.init_app(app)
+    migrate.init_app(app, db)
+
+    jwt.init_app(app)
+
+    # --------------------------
+    # Logging
+    # --------------------------
+    logs_path = os.path.join(os.getcwd(), "logs")
+    os.makedirs(logs_path, exist_ok=True)
+
+    handler = TimedRotatingFileHandler(
+        os.path.join(logs_path, "auth.log"),
+        when="midnight",
+        interval=1,
+        backupCount=30,
+        encoding="utf-8"
+    )
+
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s"
+    ))
+
+    if not app.logger.handlers:
+        app.logger.addHandler(handler)
+
+    app.logger.setLevel(logging.INFO)
+    app.logger.info("Auth service starting...")
+
+    # --------------------------
+    # Routes
+    # --------------------------
+    from .api.auth_routes import auth_bp
+    app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
+
+    # ✅ HEALTH CHECK (Render)
+    @app.get("/")
+    def health():
+        return jsonify({"status": "Auth service started successfully."}), 200
+
+    # --------------------------
+    # JWT blacklist
+    # --------------------------
+    @jwt.token_in_blocklist_loader
+    def token_revoked(jwt_header, jwt_payload):
+        jti = jwt_payload.get("jti")
+        return TokenBlocklist.query.filter_by(jti=jti).first() is not None
+
+    app.logger.info("Auth service started successfully.")
+    return app
+
+
+app\__init__.py
+
+import os
+
+
+class Config:
+    """
+    Unified configuration for:
+    - Local development (SQLite)
+    - Production on Render + Neon PostgreSQL
+    """
+
+    # -------------------------------------------------
+    # SECURITY
+    # -------------------------------------------------
+    SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "jwt-secret-key")
+
+    # -------------------------------------------------
+    # DATABASE
+    # -------------------------------------------------
+    # Local:
+    #   sqlite:///auth.db
+    # Production (Render):
+    #   DATABASE_URL = postgresql://... (Neon)
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///auth.db"
+    )
+
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # -------------------------------------------------
+    # ✅ CRITICAL FIX FOR RENDER + NEON (SSL DISCONNECT)
+    # -------------------------------------------------
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,   # Reconnect if SSL connection dropped
+        "pool_recycle": 300,     # Recycle connections every 5 minutes
+    }
+
+
+app\config.py
+
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager
+from flask_cors import CORS
+import logging
+from logging.handlers import TimedRotatingFileHandler
+import os
+
+# Initialize extension instances
+db = SQLAlchemy()
+migrate = Migrate()
+jwt = JWTManager()
+cors = CORS()
+
+def setup_logging(app):
+    """
+    Configure daily rotating logs under /logs/auth.log
+    """
+    logs_dir = os.path.join(os.getcwd(), "logs")
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir)
+
+    log_file = os.path.join(logs_dir, "auth.log")
+
+    # Avoid attaching multiple handlers during reload
+    if not any(isinstance(h, TimedRotatingFileHandler) for h in app.logger.handlers):
+        handler = TimedRotatingFileHandler(
+            log_file,
+            when="midnight",
+            interval=1,
+            backupCount=30,
+            encoding="utf-8"
+        )
+
+        formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+        )
+        handler.setFormatter(formatter)
+        handler.setLevel(logging.INFO)
+
+        app.logger.addHandler(handler)
+
+    app.logger.setLevel(logging.INFO)
+
+
+app\extensions.py
+
+# 1. Use lightweight Python image
+FROM python:3.11-slim
+
+# 2. Set working directory
+WORKDIR /app
+
+# 3. Copy dependency file first (for caching)
+COPY requirements.txt .
+
+# 4. Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 5. Copy project files
+COPY . .
+
+# 6. Run the app with Gunicorn
+# IMPORTANT:
+# - Use `sh -c` so $PORT is expanded by the shell
+# - Log to stdout/stderr (Render requirement)
+CMD ["sh", "-c", "gunicorn run:app -w 1 -b 0.0.0.0:$PORT --access-logfile - --error-logfile -"]
+
+Dockerfile
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.env
+.env.*
+
+venv/
+.venv/
+
+.git/
+.gitignore
+
+logs/
+
+.dockerignore
+
+import os
+from app import create_app
+ 
+# Create Flask app at import time (required for Gunicorn later)
+app = create_app()
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5001)) 
+    app.run(host="0.0.0.0", port=port) 
+
+run.py
+
+# ============================================================
+# PYTHON BYTECODE & CACHE (CRITICAL FOR DOCKER / RENDER)
+# ============================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+
+# ============================================================
+# VIRTUAL ENVIRONMENTS & ENV FILES
+# ============================================================
+venv/
+.venv/
+.env
+.env.*
+*.env
+
+# ============================================================
+# DATABASE FILES (LOCAL ONLY)
+# ============================================================
+*.db
+*.sqlite3
+
+# ============================================================
+# LOG FILES (LOCAL DEVELOPMENT)
+# ============================================================
+logs/
+*.log
+*.gz
+
+# ============================================================
+# FLASK MIGRATIONS
+# (Keep migration source .py files, ignore compiled cache)
+# ============================================================
+migrations/versions/__pycache__/
+migrations/versions/*.pyc
+
+# ============================================================
+# PYTEST / TESTING ARTIFACTS
+# ============================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+pytestdebug.log
+junit.xml
+
+# ============================================================
+# COVERAGE REPORTS
+# ============================================================
+coverage.xml
+
+# ============================================================
+# OS / EDITOR FILES
+# ============================================================
+Thumbs.db
+.DS_Store
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / JetBrains
+.idea/
+
+# ============================================================
+# TEMP / BACKUP FILES
+# ============================================================
+*.tmp
+*.bak
+*.swp
+
+# ============================================================
+# FLASK INSTANCE FOLDER (CRITICAL)
+# Ignore instance folder at project ROOT
+# ============================================================
+instance/
+
+.gitignore
+
+
+
+
+# =====================================================
+# 🟦 AUTH SERVICE – INTEGRATION TESTS (PYTEST)
+# =====================================================
+
+
+# --------------------------------------------
+# REGISTER SUCCESS
+# --------------------------------------------
+def test_register_user(client):
+    res = client.post("/api/v1/auth/angularUser/register", json={
+        "email": "user@test.com",
+        "password": "12345",
+        "role": "user"
+    })
+
+    assert res.status_code == 201
+
+
+# --------------------------------------------
+# DUPLICATE EMAIL TEST
+# --------------------------------------------
+def test_duplicate_register(client):
+    payload = {
+        "email": "dup@test.com",
+        "password": "12345",
+        "role": "user"
+    }
+
+    client.post("/api/v1/auth/angularUser/register", json=payload)
+    res = client.post("/api/v1/auth/angularUser/register", json=payload)
+
+    assert res.status_code == 400
+
+
+# --------------------------------------------
+# LOGIN SUCCESS
+# --------------------------------------------
+def test_login_user(client):
+    client.post("/api/v1/auth/angularUser/register", json={
+        "email": "login@test.com",
+        "password": "12345",
+        "role": "user"
+    })
+
+    res = client.post("/api/v1/auth/angularUser/login", json={
+        "email": "login@test.com",
+        "password": "12345"
+    })
+
+    assert res.status_code == 200
+    assert "access_token" in res.json
+
+
+# --------------------------------------------
+# INVALID LOGIN
+# --------------------------------------------
+def test_invalid_login(client):
+    res = client.post("/api/v1/auth/angularUser/login", json={
+        "email": "wrong@test.com",
+        "password": "wrong"
+    })
+
+    assert res.status_code == 401
+
+
+# --------------------------------------------
+# PROFILE WITHOUT TOKEN
+# --------------------------------------------
+def test_profile_requires_auth(client):
+    res = client.get("/api/v1/auth/profile")
+    assert res.status_code == 401
+
+
+# --------------------------------------------
+# PROFILE WITH TOKEN
+# --------------------------------------------
+def test_profile_with_token(client):
+    client.post("/api/v1/auth/angularUser/register", json={
+        "email": "profile@test.com",
+        "password": "12345",
+        "role": "user"
+    })
+
+    login = client.post("/api/v1/auth/angularUser/login", json={
+        "email": "profile@test.com",
+        "password": "12345"
+    })
+
+    token = login.json["access_token"]
+
+    res = client.get(
+        "/api/v1/auth/profile",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert res.status_code == 200
+
+
+# --------------------------------------------
+# LOGOUT TEST
+# --------------------------------------------
+def test_logout(client):
+    client.post("/api/v1/auth/angularUser/register", json={
+        "email": "logout@test.com",
+        "password": "12345",
+        "role": "user"
+    })
+
+    login = client.post("/api/v1/auth/angularUser/login", json={
+        "email": "logout@test.com",
+        "password": "12345"
+    })
+
+    token = login.json["access_token"]
+
+    res = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert res.status_code == 200
+
+
+tests/integration/test_auth_routes.py
+
+
+
+from app.models.user import User
+
+def test_password_hashing():
+    user = User(email="test@test.com")
+    user.set_password("secret123")
+
+    assert user.check_password("secret123")
+    assert not user.check_password("wrong")
+
+tests/unit/test_models.py
+
+import pytest
+from app import create_app
+from app.extensions import db
+
+@pytest.fixture
+def app():
+    app = create_app(testing=True)
+
+    app.config.update(
+        TESTING=True,
+        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
+        WTF_CSRF_ENABLED=False
+    )
+
+    with app.app_context():
+        db.create_all()
+        yield app
+        db.session.remove()
+        db.drop_all()
+
+@pytest.fixture
+def client(app):
+    return app.test_client()
+
+tests/conftest.py
+
+[pytest]
+pythonpath = .
+testpaths = tests
+python_files = test_*.py
+addopts = -v
+
+pytest.ini
+
+
+alembic==1.18.3
+blinker==1.9.0
+click==8.3.1
+colorama==0.4.6
+Flask==3.0.2
+Flask-Cors==4.0.0
+Flask-JWT-Extended==4.6.0
+Flask-Migrate==4.0.5
+Flask-SQLAlchemy==3.1.1
+greenlet==3.3.1
+gunicorn==21.2.0
+itsdangerous==2.2.0
+Jinja2==3.1.6
+Mako==1.3.10
+MarkupSafe==3.0.3
+packaging==26.0
+psycopg2-binary==2.9.11
+PyJWT==2.11.0
+python-dotenv==1.0.1
+SQLAlchemy==2.0.46
+typing_extensions==4.15.0
+tzdata==2025.3
+Werkzeug==3.0.1
+
+requirements.txt
+
+
+so timely i amke chanegh sand pushe sso por crted so code based what adta struces used where i knwoy but expalin si fiels truce and factory papten is this mcirosercie single idnependenta ndscalable with dcoekr and conaterization like ima sking so who they ask means whathow to expalin so give practcie flwo of exmapels to expalin if any relecabnt theya sk 
+
+and next what eachf iels doers used for and like what to first focus on so pytest code so all feture pr test apsses so tehn merge accordsinglt so upto main merge right so not devops jsut aksing mainly on python we focus so dba nd pytion codes so paostyamn and end to end angaur optoial tetsed and all fetute tiemly puhinhs im doing sooverall what aday to daya ctivieos and lieke xpalin 
+
+
