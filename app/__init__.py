@@ -86,5 +86,5 @@ def create_app(testing: bool = False):
         jti = jwt_payload.get("jti")
         return TokenBlocklist.query.filter_by(jti=jti).first() is not None
 
-    app.logger.info("Auth service started successfully.")
+    app.logger.info("Auth service started successfully.")  
     return app
