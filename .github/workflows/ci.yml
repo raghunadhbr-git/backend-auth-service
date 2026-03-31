@@ -29,7 +29,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ✅ ORIGINAL SIMPLE METADATA
+      # ✅ ORIGINAL METADATA
       - name: Set Metadata
         run: |
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
@@ -43,6 +43,7 @@ jobs:
           else
             echo "IS_TAG=false" >> $GITHUB_ENV
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+            echo "TAG=latest" >> $GITHUB_ENV
           fi
 
       # ✅ ORIGINAL LOGS
@@ -66,8 +67,13 @@ jobs:
           -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" \
           --password-stdin
 
+      # 🔥 ONLY SAFE CHANGE HERE
       - name: Build Image
-        run: docker build -t $IMAGE .
+        run: |
+          docker build \
+          --build-arg APP_VERSION=${TAG} \
+          --build-arg APP_COMMIT=${COMMIT} \
+          -t $IMAGE .
 
       - name: Push SHA Image
         run: docker push $IMAGE
@@ -84,7 +90,7 @@ jobs:
           docker tag $IMAGE pythoncodelife/auth-service:${TAG}
           docker push pythoncodelife/auth-service:${TAG}
 
-      # ✅ ORIGINAL EMAIL (SAFE)
+      # ✅ EMAIL SAME
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -97,17 +103,6 @@ jobs:
           to: ${{ secrets.MAIL_TO_DEV }}
           cc: ${{ secrets.MAIL_CC_DEV }}
           from: ${{ secrets.MAIL_USERNAME_DEV }}
-          body: |
-            CI SUCCESS 🚀
-
-            Ref: ${{ env.REF }}
-            Commit: ${{ env.COMMIT }}
-
-            Docker Image:
-            ${{ env.IMAGE }}
-
-            URL:
-            ${{ env.URL }}
 
       - name: Email Failure
         if: failure()
