@@ -10,23 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -----------------------------------
-      # 🔹 Checkout full repo
-      # -----------------------------------
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # -----------------------------------
-      # 🔹 Fetch tags
-      # -----------------------------------
       - name: Fetch Tags
         run: git fetch --tags
 
-      # -----------------------------------
-      # 🔹 Get latest + previous tag
-      # -----------------------------------
       - name: Get Tags
         run: |
           TAGS=($(git tag --sort=-v:refname))
@@ -45,18 +36,10 @@ jobs:
           COMMIT=$(git rev-list -n 1 $LATEST)
           echo "COMMIT=$COMMIT" >> $GITHUB_ENV
 
-          echo "Latest tag: $LATEST"
-          echo "Previous tag: $PREVIOUS"
-
-      # -----------------------------------
-      # 🔹 Pull latest image
-      # -----------------------------------
       - name: Pull Latest Image
         run: docker pull $IMAGE
 
-      # -----------------------------------
-      # 🚀 Deploy latest (UPDATED 🔥)
-      # -----------------------------------
+      # 🚀 FIXED DEPLOY
       - name: Deploy Latest
         run: |
           curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_ENVIRONMENT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
@@ -69,15 +52,9 @@ jobs:
             }
           }'
 
-      # -----------------------------------
-      # 🔹 Wait for deploy
-      # -----------------------------------
       - name: Wait
         run: sleep 30
 
-      # -----------------------------------
-      # 🔹 Health check latest
-      # -----------------------------------
       - name: Health Check Latest
         id: health_latest
         run: |
@@ -92,9 +69,7 @@ jobs:
             exit 1
           fi
 
-      # ===================================
-      # ⚠️ FALLBACK → PREVIOUS TAG
-      # ===================================
+      # 🔁 FALLBACK
       - name: Pull Previous Image
         if: failure()
         run: docker pull $PREV_IMAGE
@@ -124,12 +99,8 @@ jobs:
             exit 1
           fi
 
-      # ===================================
-      # 📧 EMAILS
-      # ===================================
-
-      # SUCCESS
-      - name: Email Success (Latest)
+      # 📧 SUCCESS MAIL
+      - name: Email Success
         if: success() && env.STATUS == 'success'
         uses: dawidd6/action-send-mail@v3
         with:
@@ -154,7 +125,7 @@ jobs:
             Response:
             ${{ env.RESPONSE }}
 
-      # FALLBACK SUCCESS
+      # ⚠️ FALLBACK MAIL
       - name: Email Fallback Success
         if: env.FALLBACK_STATUS == 'success'
         uses: dawidd6/action-send-mail@v3
@@ -179,7 +150,7 @@ jobs:
             Response:
             ${{ env.PREV_RESPONSE }}
 
-      # FINAL FAILURE
+      # 🚨 FINAL FAILURE MAIL (FIXED)
       - name: Email Final Failure
         if: failure() && env.FALLBACK_STATUS == 'fail'
         uses: dawidd6/action-send-mail@v3
@@ -196,7 +167,7 @@ jobs:
             🚨 BOTH DEPLOYMENTS FAILED 🚨
 
             Latest Tag Failed: ${{ env.TAG }}
-            Previous Tag Failed: ${{ env.PREV_TAG }
+            Previous Tag Failed: ${{ env.PREV_TAG }}
 
             Immediate manual rollback required!
 
