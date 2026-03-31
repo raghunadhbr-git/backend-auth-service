@@ -75,7 +75,7 @@ def create_app(testing: bool = False):
 
             # # 🔥 Dynamic values from Railway / CI-CD
             # "version": os.getenv("APP_VERSION", "unknown"),   # build version (tag)
-            # "commit": os.getenv("APP_COMMIT", "unknown")      # commit hash
+            # "commit": os.getenv("APP_COMMIT", "unknown")       # commit hash
         }), 200
 
     # --------------------------
