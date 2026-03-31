@@ -73,9 +73,9 @@ def create_app(testing: bool = False):
         return jsonify({
             "status": "Auth service started successfully.",
 
-            # 🔥 Dynamic values from Railway / CI-CD
-            "version": os.getenv("APP_VERSION", "unknown"),   # build version (tag)
-            "commit": os.getenv("APP_COMMIT", "unknown")      # commit hash
+            # # 🔥 Dynamic values from Railway / CI-CD
+            # "version": os.getenv("APP_VERSION", "unknown"),   # build version (tag)
+            # "commit": os.getenv("APP_COMMIT", "unknown")      # commit hash
         }), 200
 
     # --------------------------
