@@ -17,6 +17,6 @@ git commit -m "🚀 Add Practice Auth App with Pytest (8 Tests Passing)
 🟢 Implemented in-memory storage for simplicity
 🟢 Added pytest with 8 test cases (all passing)
 🟢 Verified API flows and authentication logic
-🟢 No impact on production code
+🟢 No impact on production code 
 🟢 Used only for practice/demo"
 git push origin main 
