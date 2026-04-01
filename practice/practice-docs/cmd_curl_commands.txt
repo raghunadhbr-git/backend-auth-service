@@ -1,0 +1,65 @@
+# =====================================================
+# 🔥 AUTH API TESTING (CURL COMMANDS)
+# Base URL: http://127.0.0.1:5000/api/v1/auth
+# =====================================================
+
+# 🟢 1️⃣ HEALTH CHECK
+curl -X GET http://127.0.0.1:5000/api/v1/auth/
+
+
+# 🟦 2️⃣ REGISTER USER
+curl -X POST http://127.0.0.1:5000/api/v1/auth/angularUser/register \
+-H "Content-Type: application/json" \
+-d "{\"email\":\"user@test.com\",\"password\":\"12345\",\"role\":\"user\"}"
+
+
+# 🟦 3️⃣ REGISTER DUPLICATE (EXPECT 400)
+curl -X POST http://127.0.0.1:5000/api/v1/auth/angularUser/register \
+-H "Content-Type: application/json" \
+-d "{\"email\":\"user@test.com\",\"password\":\"12345\",\"role\":\"user\"}"
+
+
+# 🟩 4️⃣ LOGIN (GET TOKEN)
+curl -X POST http://127.0.0.1:5000/api/v1/auth/angularUser/login \
+-H "Content-Type: application/json" \
+-d "{\"email\":\"user@test.com\",\"password\":\"12345\"}"
+
+
+# 👉 COPY TOKEN FROM RESPONSE AND REPLACE BELOW
+# Example:
+# TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+set TOKEN=PASTE_YOUR_TOKEN_HERE
+
+
+# 🟨 5️⃣ PROFILE (VALID TOKEN)
+curl -X GET http://127.0.0.1:5000/api/v1/auth/profile \
+-H "Authorization: Bearer %TOKEN%"
+
+
+# 🟧 6️⃣ LOGOUT
+curl -X POST http://127.0.0.1:5000/api/v1/auth/logout \
+-H "Authorization: Bearer %TOKEN%"
+
+
+# 🔴 7️⃣ PROFILE AFTER LOGOUT (EXPECT 401)
+curl -X GET http://127.0.0.1:5000/api/v1/auth/profile \
+-H "Authorization: Bearer %TOKEN%"
+
+🚀 PUSH COMMAND
+git add .
+git commit -m "📄 Add curl commands for auth API testing
+
+🟢 Added health, register, login, profile, logout curl examples
+🟢 Covers full JWT flow testing via CLI
+🟢 Useful for quick API validation without Postman
+🟢 No impact on production"
+git push origin main
+
+💯 DONE BRO
+
+👉 Now you have:
+✔ Postman
+✔ Pytest
+✔ Curl
+✔ Debug
