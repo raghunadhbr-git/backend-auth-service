@@ -1,4 +1,4 @@
-name: CI - Build & Push Docker
+name: 🚀 CI - Build, Test & Push Docker
 
 on:
   push:
@@ -22,15 +22,35 @@ on:
 
 jobs:
   build:
-    name: CI Build - ${{ github.ref_name }}
+    name: 🚀 CI Build - ${{ github.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      # 🟢 Checkout Code
+      - name: 🟢 Checkout Code
         uses: actions/checkout@v3
 
-      # ✅ ORIGINAL SIMPLE METADATA
-      - name: Set Metadata
+      # 🟢 Setup Python
+      - name: 🟢 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # 🟢 Install Dependencies
+      - name: 🟢 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      # 🟢 Run Pytest (VERY IMPORTANT)
+      - name: 🟢 Run Tests (Pytest)
+        run: |
+          echo "🧪 Running Pytest..."
+          pytest
+
+      # 🟢 Set Metadata
+      - name: 🟢 Set Metadata
         run: |
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
           echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
@@ -45,47 +65,52 @@ jobs:
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           fi
 
-      # ✅ ORIGINAL LOGS
-      - name: Show Execution Info
+      # 🟢 Show Logs
+      - name: 🟢 Show Execution Info
         run: |
           echo "🚀 CI TRIGGERED"
           echo "Ref: $REF"
           echo "Commit: $COMMIT"
 
           if [ "$IS_TAG" = "true" ]; then
-            echo "Type: TAG BUILD"
+            echo "🏷️ Type: TAG BUILD"
             echo "Tag: $TAG"
           else
-            echo "Type: BRANCH BUILD"
+            echo "🌿 Type: BRANCH BUILD"
             echo "Branch: $BRANCH"
           fi
 
-      - name: Docker Login
+      # 🟢 Docker Login
+      - name: 🟢 Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login \
           -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" \
           --password-stdin
 
-      - name: Build Image
+      # 🟢 Build Docker Image
+      - name: 🟢 Build Image
         run: docker build -t $IMAGE .
 
-      - name: Push SHA Image
+      # 🟢 Push SHA Image
+      - name: 🟢 Push SHA Image
         run: docker push $IMAGE
 
-      - name: Tag Latest
+      # 🟢 Tag Latest (Branches)
+      - name: 🟢 Tag Latest
         if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:latest
           docker push pythoncodelife/auth-service:latest
 
-      - name: Tag Version
+      # 🟢 Tag Version (Tags)
+      - name: 🟢 Tag Version
         if: env.IS_TAG == 'true'
         run: |
           docker tag $IMAGE pythoncodelife/auth-service:${TAG}
           docker push pythoncodelife/auth-service:${TAG}
 
-      # ✅ ORIGINAL EMAIL (SAFE)
-      - name: Email Success
+      # 🟢 Email Success
+      - name: 🟢 Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -109,6 +134,7 @@ jobs:
             URL:
             ${{ env.URL }}
 
-      - name: Email Failure
+      # 🔴 Email Failure
+      - name: 🔴 Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
