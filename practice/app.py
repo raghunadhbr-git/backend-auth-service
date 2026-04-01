@@ -25,8 +25,8 @@ def create_app():
     jwt = JWTManager(app)
 
     # In-memory DB
-    users = {}
-    blacklist = set()
+    users = {}        # dict (fake DB)
+    blacklist = set() # set (fake token storage) 
 
     auth_bp = Blueprint("auth", __name__)
 
