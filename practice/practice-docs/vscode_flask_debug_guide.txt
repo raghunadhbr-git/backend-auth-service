@@ -1,0 +1,126 @@
+# =====================================================
+# 🔥 VS CODE DEBUGGING – FLASK (PRACTICE APP)
+# =====================================================
+
+# 🟢 STEP 1: OPEN FILE
+Open: practice/app.py
+
+# 🟢 STEP 2: ADD BREAKPOINTS
+Click left side OR press F9 on:
+- data = request.get_json()
+- email = data.get(...)
+- user = users.get(email)
+- token = create_access_token(...)
+- user_id = get_jwt_identity()
+- jti = get_jwt()["jti"]
+
+# =====================================================
+# 🚀 START DEBUGGING
+# =====================================================
+
+# ▶️ PRESS:
+F5
+
+✔ This starts Flask app in DEBUG MODE
+✔ VS Code attaches debugger
+✔ Server runs like normal
+
+# =====================================================
+# 🔥 MAIN FLOW (VERY IMPORTANT)
+# =====================================================
+
+1️⃣ Press F5 → server starts
+
+2️⃣ Send request from Postman
+
+3️⃣ VS Code automatically:
+   👉 Pauses at breakpoint
+   👉 Highlights line (yellow)
+   👉 Shows variables
+
+4️⃣ Now control execution:
+
+# =====================================================
+# 🎮 DEBUG CONTROLS
+# =====================================================
+
+Continue → F5
+Step Over → F10
+Step Into → F11
+Step Out → Shift + F11
+Restart → Ctrl + Shift + F5
+Stop → Shift + F5
+
+# =====================================================
+# 🔍 WHAT TO CHECK (REAL DEBUGGING)
+# =====================================================
+
+REGISTER:
+✔ data → incoming JSON
+✔ email, password values
+✔ users dict updated
+
+LOGIN:
+✔ user exists
+✔ password match
+✔ token generated
+
+PROFILE:
+✔ token decoded
+✔ user_id correct
+
+LOGOUT:
+✔ jti value
+✔ blacklist updated
+
+# =====================================================
+# 🧠 IMPORTANT UNDERSTANDING
+# =====================================================
+
+👉 F5 (first time):
+Starts debug server
+
+👉 F5 (during pause):
+Continues execution
+
+👉 Postman:
+Triggers breakpoints
+
+👉 Debugger:
+Shows real-time values
+
+# =====================================================
+# 🛑 STOP DEBUGGING
+# =====================================================
+
+Press:
+Shift + F5
+
+✔ Stops server
+✔ Ends debug session
+
+# =====================================================
+# 🎯 FINAL FLOW (REMEMBER THIS)
+# =====================================================
+
+F5 → Start Debug
+Postman → Send Request
+VS Code → Pause at breakpoint
+F10/F11 → Inspect values
+F5 → Continue
+Shift+F5 → Stop
+
+# =====================================================
+# 💯 DONE
+# =====================================================
+
+🚀 PUSH NOW
+git add .
+git commit -m "🐞 Add VS Code Flask debugging guide
+
+🟢 Added step-by-step debug instructions
+🟢 Included breakpoints and controls (F5, F10, F11)
+🟢 Explained Postman-triggered debugging flow
+🟢 Useful for interview and development practice"
+git push origin main
+
