@@ -1,3 +1,7 @@
+# =====================================================
+# 🟦 APP FACTORY – FINAL VERSION (CI/CD READY)
+# =====================================================
+
 import os
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -6,7 +10,7 @@ from flask import Flask, jsonify
 from .config import Config
 from .extensions import db, migrate, jwt, cors
 
-# Import models for Alembic (DB migrations)
+# Import models for Alembic
 from .models.user import User
 from .models.token_blacklist import TokenBlocklist
 
@@ -15,12 +19,12 @@ def create_app(testing: bool = False):
     app = Flask(__name__)
 
     # --------------------------
-    # 🔹 Load base configuration
+    # 🔹 Load config
     # --------------------------
     app.config.from_object(Config)
 
     # --------------------------
-    # 🔹 Testing override (used in pytest)
+    # 🔹 Testing override
     # --------------------------
     if testing:
         app.config["TESTING"] = True
@@ -28,15 +32,15 @@ def create_app(testing: bool = False):
         app.config["JWT_SECRET_KEY"] = "test-secret"
 
     # --------------------------
-    # 🔹 Initialize extensions
+    # 🔹 Init extensions
     # --------------------------
-    cors.init_app(app)        # Enable CORS (Angular ↔ Flask)
-    db.init_app(app)          # Database connection
-    migrate.init_app(app, db) # DB migrations (Alembic)
-    jwt.init_app(app)         # JWT authentication
+    cors.init_app(app)
+    db.init_app(app)
+    migrate.init_app(app, db)
+    jwt.init_app(app)
 
     # --------------------------
-    # 🔹 Logging setup
+    # 🔹 Logging
     # --------------------------
     logs_path = os.path.join(os.getcwd(), "logs")
     os.makedirs(logs_path, exist_ok=True)
@@ -60,31 +64,31 @@ def create_app(testing: bool = False):
     app.logger.info("Auth service starting...")
 
     # --------------------------
-    # 🔹 Register routes (API)
+    # 🔹 Register routes
     # --------------------------
     from .api.auth_routes import auth_bp
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
 
     # --------------------------
-    # 🔹 HEALTH CHECK (MAIN API)
+    # 🔹 HEALTH CHECK (UPDATED)
     # --------------------------
     @app.get("/")
     def health():
         return jsonify({
             "status": "Auth service started successfully.",
 
-            # # 🔥 Dynamic values from Railway / CI-CD
-            # "version": os.getenv("APP_VERSION", "unknown"),   # build version (tag)
-            # "commit": os.getenv("APP_COMMIT", "unknown")       # commit hash
+            # ✅ CI/CD values (safe fallback)
+            "version": os.getenv("APP_VERSION", "local"),
+            "commit": os.getenv("APP_COMMIT", "local")
         }), 200
 
     # --------------------------
-    # 🔹 JWT Blacklist (Logout support)
+    # 🔹 JWT Blacklist
     # --------------------------
     @jwt.token_in_blocklist_loader
     def token_revoked(jwt_header, jwt_payload):
         jti = jwt_payload.get("jti")
         return TokenBlocklist.query.filter_by(jti=jti).first() is not None
 
-    app.logger.info("Auth service started successfully.")  
+    app.logger.info("Auth service started successfully.")
     return app
