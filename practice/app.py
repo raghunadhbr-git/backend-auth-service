@@ -1,66 +1,50 @@
 # =====================================================
-# FULL AUTH APP (JWT + BLUEPRINT)
+# DEBUG VERSION (ADD PRINTS)
 # =====================================================
 
-from flask import Flask
-from flask_jwt_extended import JWTManager
-
-from flask import Blueprint, request, jsonify
+from flask import Flask, Blueprint, request, jsonify
 from flask_jwt_extended import (
-    create_access_token,
-    jwt_required,
-    get_jwt_identity,
-    get_jwt
+    JWTManager, create_access_token,
+    jwt_required, get_jwt_identity, get_jwt
 )
 import hashlib
 
-# -----------------------------
-# APP FACTORY
-# -----------------------------
+
 def create_app():
     app = Flask(__name__)
-
     app.config["JWT_SECRET_KEY"] = "super-secret-key"
 
     jwt = JWTManager(app)
 
-    # In-memory DB
-    users = {}        # dict (fake DB)
-    blacklist = set() # set (fake token storage) 
+    users = {}
+    blacklist = set()
 
     auth_bp = Blueprint("auth", __name__)
-
-    # -----------------------------
-    # HEALTH
-    # -----------------------------
-    @auth_bp.get("/")
-    def health():
-        return jsonify({"status": "UP"}), 200
 
     # -----------------------------
     # REGISTER
     # -----------------------------
     @auth_bp.post("/angularUser/register")
     def register():
-        data = request.get_json() or {}
+        data = request.get_json()
+        print("🔍 Incoming Register Data:", data)
 
         email = data.get("email")
         password = data.get("password")
-        role = data.get("role", "user")
 
-        if not email or not password:
-            return jsonify({"message": "email and password required"}), 400
+        print("📩 Email:", email)
+        print("🔑 Password:", password)
 
         if email in users:
+            print("❌ Duplicate user")
             return jsonify({"message": "User already exists"}), 400
 
         hashed = hashlib.sha256(password.encode()).hexdigest()
+        print("🔐 Hashed Password:", hashed)
 
-        users[email] = {
-            "password": hashed,
-            "role": role,
-            "id": len(users) + 1
-        }
+        users[email] = {"password": hashed, "id": len(users) + 1}
+
+        print("✅ User Stored:", users)
 
         return jsonify({"message": "User registered successfully"}), 201
 
@@ -69,64 +53,65 @@ def create_app():
     # -----------------------------
     @auth_bp.post("/angularUser/login")
     def login():
-        data = request.get_json() or {}
+        data = request.get_json()
+        print("🔍 Login Data:", data)
 
         email = data.get("email")
         password = data.get("password")
 
         user = users.get(email)
+        print("👤 User Found:", user)
 
         if not user:
             return jsonify({"message": "Invalid email or password"}), 401
 
         hashed = hashlib.sha256(password.encode()).hexdigest()
 
+        print("🔐 Hashed Input:", hashed)
+
         if user["password"] != hashed:
+            print("❌ Password mismatch")
             return jsonify({"message": "Invalid email or password"}), 401
 
         token = create_access_token(identity=str(user["id"]))
+        print("🎟️ Token Generated:", token)
 
-        return jsonify({
-            "access_token": token,
-            "userId": user["id"],
-            "role": user["role"]
-        }), 200
+        return jsonify({"access_token": token}), 200
 
     # -----------------------------
-    # PROFILE (JWT REQUIRED)
+    # PROFILE
     # -----------------------------
     @auth_bp.get("/profile")
     @jwt_required()
     def profile():
         user_id = get_jwt_identity()
+        print("👤 Logged in user:", user_id)
+
         return jsonify({"user_id": user_id}), 200
 
     # -----------------------------
-    # LOGOUT (BLACKLIST)
+    # LOGOUT
     # -----------------------------
     @auth_bp.post("/logout")
     @jwt_required()
     def logout():
         jti = get_jwt()["jti"]
-        blacklist.add(jti)
-        return jsonify({"message": "Logged out successfully"}), 200
+        print("🚫 Blacklisting token:", jti)
 
-    # -----------------------------
-    # BLOCKLIST CHECK
-    # -----------------------------
+        blacklist.add(jti)
+        return jsonify({"message": "Logged out"}), 200
+
     @jwt.token_in_blocklist_loader
-    def check_if_token_revoked(jwt_header, jwt_payload):
+    def check(jwt_header, jwt_payload):
         return jwt_payload["jti"] in blacklist
 
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
-
     return app
 
 
-# -----------------------------
-# RUN
-# -----------------------------
 app = create_app()
 
 if __name__ == "__main__":
     app.run(debug=True)
+    
+    
