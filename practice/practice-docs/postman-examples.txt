@@ -1,0 +1,119 @@
+FULL DETAILED REAL TESTING GUIDE (exact payloads + responses)
+👉 Use directly in Postman 💯
+________________________________________
+🚀 🔥 SERVICE RUN CHECK
+🟢 STEP 1: RUN SERVER
+cd practice
+python app.py
+________________________________________
+🟢 STEP 2: CHECK HEALTH
+GET
+http://127.0.0.1:5000/api/v1/auth/
+RESPONSE
+{
+  "status": "UP"
+}
+👉 ✅ Service is running
+________________________________________
+🟦 1️⃣ REGISTER API
+POST
+http://127.0.0.1:5000/api/v1/auth/angularUser/register
+BODY (JSON)
+{
+  "email": "user@test.com",
+  "password": "12345",
+  "role": "user"
+}
+✅ SUCCESS RESPONSE (201)
+{
+  "message": "User registered successfully"
+}
+________________________________________
+❌ DUPLICATE USER (400)
+{
+  "message": "User already exists"
+}
+________________________________________
+🟩 2️⃣ LOGIN API
+POST
+http://127.0.0.1:5000/api/v1/auth/angularUser/login
+BODY
+{
+  "email": "user@test.com",
+  "password": "12345"
+}
+________________________________________
+✅ SUCCESS (200)
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "userId": 1,
+  "role": "user"
+}
+👉 🔥 Copy this token
+________________________________________
+❌ INVALID LOGIN (401)
+{
+  "message": "Invalid email or password"
+}
+________________________________________
+🟨 3️⃣ PROFILE API (PROTECTED)
+GET
+http://127.0.0.1:5000/api/v1/auth/profile
+HEADER
+Authorization: Bearer <PASTE_TOKEN>
+________________________________________
+✅ SUCCESS (200)
+{
+  "user_id": "1"
+}
+________________________________________
+❌ NO TOKEN (401)
+{
+  "msg": "Missing Authorization Header"
+}
+________________________________________
+🟧 4️⃣ LOGOUT API
+POST
+http://127.0.0.1:5000/api/v1/auth/logout
+HEADER
+Authorization: Bearer <PASTE_TOKEN>
+________________________________________
+✅ SUCCESS (200)
+{
+  "message": "Logged out successfully"
+}
+________________________________________
+🔴 5️⃣ TOKEN INVALID AFTER LOGOUT
+👉 Call PROFILE again:
+GET
+/api/v1/auth/profile
+________________________________________
+❌ RESPONSE (401)
+{
+  "msg": "Token has been revoked"
+}
+________________________________________
+🔥 FULL TEST FLOW (IMPORTANT)
+👉 Follow EXACT order:
+1.	Health → check service 
+2.	Register → create user 
+3.	Login → get token 
+4.	Profile → success 
+5.	Logout → invalidate token 
+6.	Profile again → FAIL 
+________________________________________
+💯 FINAL RESULT
+👉 If all works:
+✔ API working
+✔ JWT working
+✔ Auth flow correct
+✔ Logout working
+✔ Security working
+________________________________________
+🎯 INTERVIEW LINE
+👉 Say:
+“I verified all APIs using Postman including register, login, protected routes, and logout with JWT authentication.”
+________________________________________
+🔥 DONE BRO
+👉 This is real backend testing like production
+

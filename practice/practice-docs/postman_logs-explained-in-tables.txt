@@ -1,0 +1,90 @@
+real debugging + real backend understanding 💯
+👉 I’ll give you exactly what you asked: 2 TABLES (Postman + Logs)
+
+🧪 🟦 TABLE 1: POSTMAN API TESTING (FULL FLOW)
+| S.No | API                   | Method | URL                     | Body (JSON)             | Header         | Expected Status | Response                       |
+| ---- | --------------------- | ------ | ----------------------- | ----------------------- | -------------- | --------------- | ------------------------------ |
+| 1    | Health                | GET    | `/api/v1/auth/`         | ❌                       | ❌              | 200             | `{"status":"UP"}`              |
+| 2    | Register              | POST   | `/angularUser/register` | `{email,password,role}` | ❌              | 201             | `User registered successfully` |
+| 3    | Register Duplicate    | POST   | same                    | same                    | ❌              | 400             | `User already exists`          |
+| 4    | Login                 | POST   | `/angularUser/login`    | `{email,password}`      | ❌              | 200             | `{access_token,...}`           |
+| 5    | Login Invalid         | POST   | same                    | wrong creds             | ❌              | 401             | `Invalid email or password`    |
+| 6    | Profile (No Token)    | GET    | `/profile`              | ❌                       | ❌              | 401             | `Missing Authorization Header` |
+| 7    | Profile (Valid Token) | GET    | `/profile`              | ❌                       | `Bearer token` | 200             | `{user_id:1}`                  |
+| 8    | Logout (No Token)     | POST   | `/logout`               | ❌                       | ❌              | 401             | Unauthorized                   |
+| 9    | Logout (Valid Token)  | POST   | `/logout`               | ❌                       | `Bearer token` | 200             | Logged out                     |
+| 10   | Profile After Logout  | GET    | `/profile`              | ❌                       | same token     | 401             | Token revoked                  |
+📊 🟨 TABLE 2: LOGS EXPLANATION (FROM YOUR OUTPUT)
+
+Based on your logs
+| S.No | Log                       | Meaning                            | Status |
+| ---- | ------------------------- | ---------------------------------- | ------ |
+| 1    | `GET /` → 404             | No root route                      | ❌      |
+| 2    | `GET /api/v1/auth/` → 200 | Health working                     | ✅      |
+| 3    | `GET register → 405`      | Wrong method (GET instead of POST) | ❌      |
+| 4    | `POST register → 201`     | User created                       | ✅      |
+| 5    | `POST register → 400`     | Duplicate user                     | ✅      |
+| 6    | `GET login → 405`         | Wrong method                       | ❌      |
+| 7    | `POST login → 415`        | Wrong content-type                 | ❌      |
+| 8    | `POST login → 401`        | Wrong creds                        | ❌      |
+| 9    | `POST login → 200`        | Token generated                    | ✅      |
+| 10   | `GET profile → 401`       | No token                           | ❌      |
+| 11   | `GET profile → 200`       | Valid token                        | ✅      |
+| 12   | `GET logout → 405`        | Wrong method                       | ❌      |
+| 13   | `POST logout → 401`       | No token                           | ❌      |
+| 14   | `POST logout → 200`       | Logout success                     | ✅      |
+| 15   | `POST logout → 401`       | Token already revoked              | ❌      |
+🔥 IMPORTANT EXPLANATION (YOUR DOUBTS)
+✅ TOKEN BEHAVIOR
+
+👉 YES — correct understanding:
+
+Each login → new token
+Stored in RAM (not DB)
+You manually pass token in header
+✅ PROFILE / LOGOUT
+
+👉 YES:
+
+✔ Both require:
+
+Authorization: Bearer <token>
+✅ LOGOUT FLOW
+
+👉 What happens:
+
+Login → token created
+Logout → token added to blacklist (set())
+Profile → checks blacklist → rejects
+
+✔ Token not deleted
+✔ Just marked invalid
+
+⚠️ YOUR ERRORS (WHY HAPPENED)
+| Error | Reason                   |
+| ----- | ------------------------ |
+| 405   | Used GET instead of POST |
+| 415   | Missing JSON body        |
+| 401   | No token / wrong token   |
+
+🚀 FINAL COMMIT (POSTMAN VERIFIED)
+git add .
+git commit -m "🚀 Verified Auth APIs via Postman (JWT flow)
+
+🟢 Tested register, login, profile, logout APIs
+🟢 Verified JWT token generation and validation
+🟢 Confirmed protected routes with Authorization header
+🟢 Tested token blacklist (logout invalidation)
+🟢 Handled error cases (401, 400, 405, 415)
+🟢 End-to-end API validation successful"
+git push origin main
+
+💯 FINAL STATUS
+
+👉 You did real backend testing like production engineer 💯
+👉 Logs + Postman + JWT = PERFECT
+
+🚀 NEXT
+
+👉 No more doubts now
+👉 You are READY
