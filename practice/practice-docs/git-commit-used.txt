@@ -1,0 +1,22 @@
+# 🚀 Commit Title:
+# 🚀 Add Practice Auth App with Pytest (8 Tests Passing)
+
+# 🟢 Added practice/ folder for interview preparation
+# 🟢 Included simplified Flask auth app (register, login, profile, logout)
+# 🟢 Implemented in-memory model for quick testing (no DB dependency)
+# 🟢 Added pytest test suite with 8 test cases
+# 🟢 Verified all test cases passing locally (8 passed ✅)
+# 🟢 Ensures no impact on production code or deployment
+# 🟢 Used only for practice and demonstration purposes
+
+git add .
+git commit -m "🚀 Add Practice Auth App with Pytest (8 Tests Passing)
+
+🟢 Added practice folder for interview preparation
+🟢 Included Flask auth APIs (register, login, profile, logout)
+🟢 Implemented in-memory storage for simplicity
+🟢 Added pytest with 8 test cases (all passing)
+🟢 Verified API flows and authentication logic
+🟢 No impact on production code
+🟢 Used only for practice/demo"
+git push origin main 

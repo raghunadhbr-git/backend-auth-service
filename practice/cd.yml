@@ -1,0 +1,22 @@
+name: 🚀 CD - Deploy Latest Tag
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # 2 AM daily
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Latest Tag
+        run: echo "Fetching latest tag..."
+
+      - name: Deploy
+        run: echo "Deploying latest version..."
+
+      - name: Health Check
+        run: echo "Service is running..."
+
+      - name: Done
+        run: echo "DEPLOY SUCCESS" 
