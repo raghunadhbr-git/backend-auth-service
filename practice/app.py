@@ -18,8 +18,12 @@ def create_app():
 
     jwt = JWTManager(app)
 
-    users = {}
-    blacklist = set()
+    # -----------------------------
+    # "MODEL" (IN-MEMORY)
+    # -----------------------------
+    users = {}          # acts like DB table
+    blacklist = set()   # token blacklist
+
 
     auth_bp = Blueprint("auth", __name__)
 
