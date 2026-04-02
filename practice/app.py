@@ -1,4 +1,6 @@
 # =====================================================
+# FLASK AUTH MICROSERVICE (ALL-IN-ONE PRACTICE FILE)
+# Includes: Routes + Service + Model (in-memory)
 # DEBUG VERSION (ADD PRINTS)
 # =====================================================
 
