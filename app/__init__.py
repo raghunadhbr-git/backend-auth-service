@@ -78,8 +78,8 @@ def create_app(testing: bool = False):
             "status": "Auth-Service-UP.",
 
             # ✅ CI/CD values (safe fallback)
-            "version": os.getenv("APP_VERSION", "local"),
-            "commit": os.getenv("APP_COMMIT", "local")
+            # "version": os.getenv("APP_VERSION", "local"),
+            # "commit": os.getenv("APP_COMMIT", "local")
         }), 200
 
     # --------------------------
