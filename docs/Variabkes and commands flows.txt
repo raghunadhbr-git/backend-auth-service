@@ -1,0 +1,9 @@
+product superbase apsted:-
+postgresql://postgres.jaazlcpmowovdsocfmrx:[YOUR-PASSWORD]@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
+Raghunadh_1992
+
+Modified Now:-
+postgresql://postgres.jaazlcpmowovdsocfmrx:Raghunadh_1992@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
+
+
+

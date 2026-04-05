@@ -1,0 +1,124 @@
+# =====================================================
+# 📄 FILE: docs_postman_examples.txt
+# PURPOSE: All Postman request examples + project run info
+# =====================================================
+
+# =====================================================
+# 📁 PROJECT STRUCTURE (inside "practice" folder)
+# =====================================================
+# practice/
+# ├── auth_app_layered.py        # Main Flask app (run this)
+# ├── test_auth_layered.py       # Pytest file
+# ├── docs_postman_examples.txt  # This file
+# ├── docs_curl_examples.txt     # Curl commands file
+# =====================================================
+
+
+# =====================================================
+# ▶️ HOW TO RUN APPLICATION
+# =====================================================
+# Step 1: Go to practice folder
+# cd practice
+
+# Step 2: Run Flask app
+# python auth_app_layered.py
+
+# Server runs at:
+# http://127.0.0.1:5000
+
+
+# =====================================================
+# 🧪 HOW TO RUN TESTS (PYTEST)
+# =====================================================
+# Run:
+# pytest test_auth_layered.py -v
+
+# -v = verbose (shows all test names and results)
+
+
+# =====================================================
+# 📮 POSTMAN EXAMPLES (API TESTING)
+# Base URL: http://127.0.0.1:5000/api/v1/auth
+# =====================================================
+
+# ---------------------------
+# 1. REGISTER USER
+# ---------------------------
+# Method: POST
+# URL: /angularUser/register
+# Body (JSON):
+{
+    "email": "user@test.com",
+    "password": "12345"
+}
+
+# Expected Response:
+# 201 Created
+
+
+# ---------------------------
+# 2. LOGIN USER
+# ---------------------------
+# Method: POST
+# URL: /angularUser/login
+# Body (JSON):
+{
+    "email": "user@test.com",
+    "password": "12345"
+}
+
+# Response:
+# {
+#   "access_token": "JWT_TOKEN"
+# }
+
+# 👉 Copy this token for next requests
+
+
+# ---------------------------
+# 3. PROFILE (Protected)
+# ---------------------------
+# Method: GET
+# URL: /profile
+
+# Headers:
+# Authorization: Bearer <JWT_TOKEN>
+
+# Response:
+# {
+#   "user_id": "1"
+# }
+
+
+# ---------------------------
+# 4. LOGOUT
+# ---------------------------
+# Method: POST
+# URL: /logout
+
+# Headers:
+# Authorization: Bearer <JWT_TOKEN>
+
+# Response:
+# {
+#   "message": "Logged out"
+# }
+
+
+# ---------------------------
+# 5. PROFILE AFTER LOGOUT (FAIL)
+# ---------------------------
+# Method: GET
+# URL: /profile
+
+# Headers:
+# Authorization: Bearer <JWT_TOKEN>
+
+# Expected:
+# 401 Unauthorized
+
+
+# =====================================================
+# 🔁 FLOW SUMMARY (INTERVIEW READY)
+# =====================================================
+# Postman → Route → Service → Model → Response(JSON)

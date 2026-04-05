@@ -1,0 +1,76 @@
+# =====================================================
+# 📄 FILE: docs_curl_examples.txt
+# PURPOSE: All CURL command examples for terminal testing
+# =====================================================
+
+# =====================================================
+# ▶️ MAKE SURE APP IS RUNNING FIRST
+# =====================================================
+# python auth_app_layered.py
+
+
+# =====================================================
+# 🌐 BASE URL
+# =====================================================
+# http://127.0.0.1:5000/api/v1/auth
+
+
+# ---------------------------
+# 1. REGISTER USER
+# ---------------------------
+curl -X POST http://127.0.0.1:5000/api/v1/auth/angularUser/register \
+-H "Content-Type: application/json" \
+-d '{"email":"user@test.com","password":"12345"}'
+
+
+# ---------------------------
+# 2. LOGIN USER
+# ---------------------------
+curl -X POST http://127.0.0.1:5000/api/v1/auth/angularUser/login \
+-H "Content-Type: application/json" \
+-d '{"email":"user@test.com","password":"12345"}'
+
+# 👉 Copy access_token from response
+
+
+# ---------------------------
+# 3. PROFILE (Protected)
+# ---------------------------
+curl -X GET http://127.0.0.1:5000/api/v1/auth/profile \
+-H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+
+# ---------------------------
+# 4. LOGOUT
+# ---------------------------
+curl -X POST http://127.0.0.1:5000/api/v1/auth/logout \
+-H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+
+# ---------------------------
+# 5. PROFILE AFTER LOGOUT (FAIL)
+# ---------------------------
+curl -X GET http://127.0.0.1:5000/api/v1/auth/profile \
+-H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+
+# =====================================================
+# 🧪 RUN PYTEST (FROM TERMINAL)
+# =====================================================
+# pytest test_auth_layered.py -v
+
+
+# =====================================================
+# 📁 FILE REFERENCES (FOR INTERVIEW)
+# =====================================================
+# auth_app_layered.py → Main API (Route + Service + Model)
+# test_auth_layered.py → Automated tests (pytest)
+# docs_postman_examples.txt → Manual testing (Postman)
+# docs_curl_examples.txt → CLI testing (curl)
+
+
+# =====================================================
+# 🔥 INTERVIEW TIP
+# =====================================================
+# You can say:
+# "I tested my APIs using Postman, curl, and automated pytest cases"
