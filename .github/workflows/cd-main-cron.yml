@@ -31,12 +31,8 @@ jobs:
 
           echo "URL=https://backend-auth-service-ks6f.onrender.com/" >> $GITHUB_ENV
 
-          COMMIT=$(git rev-list -n 1 $LATEST)
-          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
-
       - name: Deploy Latest
-        run: |
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
       - name: Wait
         run: sleep 40
@@ -44,7 +40,6 @@ jobs:
       - name: Health Check Latest
         run: |
           RESPONSE=$(curl -s $URL)
-          echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
             echo "STATUS=success" >> $GITHUB_ENV
@@ -65,7 +60,6 @@ jobs:
         if: failure()
         run: |
           RESPONSE=$(curl -s $URL)
-          echo "PREV_RESPONSE=$RESPONSE" >> $GITHUB_ENV
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
             echo "FALLBACK_STATUS=success" >> $GITHUB_ENV
@@ -74,6 +68,7 @@ jobs:
             exit 1
           fi
 
+      # ✅ EMAIL SUCCESS
       - name: Email Success
         if: success() && env.STATUS == 'success'
         uses: dawidd6/action-send-mail@v3
@@ -85,16 +80,9 @@ jobs:
           subject: "CD SUCCESS - ${{ env.TAG }}"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            CD SUCCESS
 
-            Tag: ${{ env.TAG }}
-            Commit: ${{ env.COMMIT }}
-
-            URL:
-            ${{ env.URL }}
-
-      - name: Email Rollback Success
+      # ⚠️ ROLLBACK SUCCESS
+      - name: Email Rollback
         if: env.FALLBACK_STATUS == 'success'
         uses: dawidd6/action-send-mail@v3
         with:
@@ -105,12 +93,8 @@ jobs:
           subject: "ROLLBACK SUCCESS - ${{ env.PREV_TAG }}"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            Rollback Success
 
-            Failed Tag: ${{ env.TAG }}
-            Rolled back to: ${{ env.PREV_TAG }}
-
+      # ❌ FINAL FAILURE
       - name: Email Failure
         if: failure() && env.FALLBACK_STATUS == 'fail'
         uses: dawidd6/action-send-mail@v3
@@ -119,13 +103,6 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "CD FAILED - ACTION REQUIRED"
+          subject: "CD FAILED"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            BOTH DEPLOYMENTS FAILED
-
-            Latest Tag Failed: ${{ env.TAG }}
-            Previous Tag Failed: ${{ env.PREV_TAG }}
-
-            Manual action required
