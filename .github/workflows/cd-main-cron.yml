@@ -1,4 +1,4 @@
-name: CD - Render Deploy (Latest + Rollback)
+name: 🚀 CD - Render Deploy (Latest Tag)
 
 on:
   workflow_dispatch:
@@ -11,18 +11,26 @@ jobs:
 
     steps:
 
-      - name: Checkout
+      # =========================
+      # 🟢 Checkout Repo
+      # =========================
+      - name: 🟢 Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: Fetch Tags
+      # =========================
+      # 🟢 Fetch Tags
+      # =========================
+      - name: 🟢 Fetch Tags
         run: git fetch --tags
 
-      - name: Detect Tags
+      # =========================
+      # 🟢 Detect Latest Tag
+      # =========================
+      - name: 🟢 Detect Latest Tag
         run: |
           TAGS=($(git tag --sort=-v:refname))
-
           LATEST=${TAGS[0]}
           PREVIOUS=${TAGS[1]}
 
@@ -36,46 +44,64 @@ jobs:
           COMMIT=$(git rev-list -n 1 $LATEST)
           echo "COMMIT=$COMMIT" >> $GITHUB_ENV
 
-      - name: Deploy Latest
+          echo "🚀 Latest Tag: $LATEST"
+          echo "📦 Commit: $COMMIT"
+
+      # =========================
+      # 🟢 Deploy Latest
+      # =========================
+      - name: 🟢 Deploy Latest
         run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
-      - name: Wait
+      - name: 🟢 Wait
         run: sleep 40
 
-      - name: Health Check Latest
+      # =========================
+      # 🟢 Health Check (FIXED)
+      # =========================
+      - name: 🟢 Health Check Latest
         run: |
           RESPONSE=$(curl -s $URL)
+          echo "Response: $RESPONSE"
 
-          if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
+          if [[ "$RESPONSE" == *"Auth service running"* ]]; then
             echo "STATUS=success" >> $GITHUB_ENV
           else
             echo "STATUS=fail" >> $GITHUB_ENV
             exit 1
           fi
 
-      - name: Rollback Deploy
+      # =========================
+      # 🔁 Rollback (if fail)
+      # =========================
+      - name: 🔁 Rollback Deploy
         if: failure()
-        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          echo "⚠️ Deploy failed, trying previous tag..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
-      - name: Wait Rollback
+      - name: 🔁 Wait Rollback
         if: failure()
         run: sleep 40
 
-      - name: Health Check Rollback
+      - name: 🔁 Health Check Rollback
         if: failure()
         run: |
           RESPONSE=$(curl -s $URL)
+          echo "Rollback Response: $RESPONSE"
 
-          if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
+          if [[ "$RESPONSE" == *"Auth service running"* ]]; then
             echo "FALLBACK_STATUS=success" >> $GITHUB_ENV
           else
             echo "FALLBACK_STATUS=fail" >> $GITHUB_ENV
             exit 1
           fi
 
-      # ✅ EMAIL SUCCESS (ENHANCED)
-      - name: Email Success
-        if: success() && env.STATUS == 'success'
+      # =========================
+      # 📧 SUCCESS EMAIL
+      # =========================
+      - name: 📧 Email Success
+        if: success()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -83,7 +109,8 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_MAIN }}
           subject: "🚀 CD SUCCESS - ${{ env.TAG }}"
-          to: ${{ secrets.MAIL_TO_CC_MAIN }}
+          to: ${{ secrets.MAIL_USERNAME_MAIN }}
+          cc: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
           body: |
             🚀 DEPLOYMENT SUCCESS
@@ -100,32 +127,13 @@ jobs:
             🌐 Health Check URL:
             ${{ env.URL }}
 
-            👉 Click the URL above to verify service is running
+            👉 Click the URL to verify service
 
-      # ⚠️ ROLLBACK SUCCESS
-      - name: Email Rollback
-        if: env.FALLBACK_STATUS == 'success'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_MAIN }}
-          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "⚠️ ROLLBACK SUCCESS - ${{ env.PREV_TAG }}"
-          to: ${{ secrets.MAIL_TO_CC_MAIN }}
-          from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            ⚠️ ROLLBACK SUCCESS
-
-            ❌ Failed Tag: ${{ env.TAG }}
-            🔁 Rolled back to: ${{ env.PREV_TAG }}
-
-            🌐 Service URL:
-            ${{ env.URL }}
-
-      # ❌ FINAL FAILURE
-      - name: Email Failure
-        if: failure() && env.FALLBACK_STATUS == 'fail'
+      # =========================
+      # ❌ FAILURE EMAIL
+      # =========================
+      - name: ❌ Email Failure
+        if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -133,7 +141,8 @@ jobs:
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_MAIN }}
           subject: "🚨 CD FAILED - ACTION REQUIRED"
-          to: ${{ secrets.MAIL_TO_CC_MAIN }}
+          to: ${{ secrets.MAIL_USERNAME_MAIN }}
+          cc: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
           body: |
             🚨 DEPLOYMENT FAILED
@@ -141,7 +150,15 @@ jobs:
             ❌ Latest Tag Failed: ${{ env.TAG }}
             ❌ Previous Tag Failed: ${{ env.PREV_TAG }}
 
-            🔧 Manual intervention required
+            🔑 Commit SHA: ${{ env.COMMIT }}
 
-            🌐 URL:
+            🔗 GitHub Repo:
+            ${{ env.REPO }}
+
+            🐳 Docker Image:
+            ${{ env.DOCKER }}
+
+            🌐 Health Check URL:
             ${{ env.URL }}
+
+            🔧 Manual intervention required
