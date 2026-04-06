@@ -26,13 +26,22 @@ jobs:
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
+            TYPE="TAG"
+            NAME=$VERSION
           else
             VERSION=dev-${GITHUB_SHA}
+            TYPE="BRANCH"
+            NAME=${GITHUB_REF#refs/heads/}
           fi
 
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           echo "APP_COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "TYPE=$TYPE" >> $GITHUB_ENV
+          echo "NAME=$NAME" >> $GITHUB_ENV
+
+          echo "REPO=https://github.com/raghunadhbr-git/backend-auth-service" >> $GITHUB_ENV
+          echo "DOCKER=https://hub.docker.com/r/pythoncodelife/backend-auth-service" >> $GITHUB_ENV
 
       # ===============================
       # 🟢 Docker Login
@@ -44,7 +53,7 @@ jobs:
           --password-stdin
 
       # ===============================
-      # 🔥 Build Image (IMPORTANT FIX)
+      # 🔥 Build Image
       # ===============================
       - name: Build Image
         run: |
@@ -66,3 +75,67 @@ jobs:
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
+
+      # ===============================
+      # 📧 Email Success
+      # ===============================
+      - name: 📧 Email Success
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
+          subject: "🚀 CI SUCCESS - ${{ env.NAME }}"
+          to: ${{ secrets.MAIL_USERNAME_MAIN }}
+          cc: ${{ secrets.MAIL_TO_CC_MAIN }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            🚀 CI BUILD SUCCESS
+
+            📌 Type: ${{ env.TYPE }}
+            🏷️ Name: ${{ env.NAME }}
+
+            🔑 Commit SHA:
+            ${{ env.APP_COMMIT }}
+
+            🐳 Docker Image:
+            ${{ env.IMAGE }}
+
+            🔗 GitHub Repo:
+            ${{ env.REPO }}
+
+            🐳 Docker Hub:
+            ${{ env.DOCKER }}
+
+            👉 Build & Push completed successfully
+
+      # ===============================
+      # ❌ Email Failure
+      # ===============================
+      - name: ❌ Email Failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
+          subject: "🚨 CI FAILED - ${{ env.NAME }}"
+          to: ${{ secrets.MAIL_USERNAME_MAIN }}
+          cc: ${{ secrets.MAIL_TO_CC_MAIN }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            🚨 CI BUILD FAILED
+
+            📌 Type: ${{ env.TYPE }}
+            🏷️ Name: ${{ env.NAME }}
+
+            🔑 Commit SHA:
+            ${{ env.APP_COMMIT }}
+
+            🔗 Repo:
+            ${{ env.REPO }}
+
+            🔧 Check GitHub Actions logs
