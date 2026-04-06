@@ -15,40 +15,22 @@ jobs:
 
     steps:
 
-      # ==============================
-      # Checkout Code
-      # ==============================
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ==============================
-      # Setup Python
-      # ==============================
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # ==============================
-      # Install Dependencies
-      # ==============================
       - name: Install Dependencies
         run: |
-          echo "Installing dependencies..."
           pip install -r requirements.txt
           pip install pytest
 
-      # ==============================
-      # Run Tests
-      # ==============================
       - name: Run Tests
-        run: |
-          echo "Running tests..."
-          pytest
+        run: pytest
 
-      # ==============================
-      # Detect Branch / Tag
-      # ==============================
       - name: Detect Context
         run: |
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
@@ -63,65 +45,42 @@ jobs:
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           fi
 
-      # ==============================
-      # Logs
-      # ==============================
-      - name: Show Execution Info
+      - name: Logs
         run: |
           echo "CI TRIGGERED"
           echo "Ref: $REF"
           echo "Commit: $COMMIT"
 
           if [ "$IS_TAG" = "true" ]; then
-            echo "Type: TAG BUILD"
-            echo "Tag: $TAG"
+            echo "Tag build: $TAG"
           else
-            echo "Type: BRANCH BUILD"
-            echo "Branch: $BRANCH"
+            echo "Branch build: $BRANCH"
           fi
 
-      # ==============================
-      # Docker Login
-      # ==============================
       - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
           -u "${{ secrets.DOCKERHUB_USERNAME }}" \
           --password-stdin
 
-      # ==============================
-      # Build Image
-      # ==============================
       - name: Build Image
         run: docker build -t $IMAGE .
 
-      # ==============================
-      # Push SHA Image
-      # ==============================
       - name: Push SHA Image
         run: docker push $IMAGE
 
-      # ==============================
-      # Tag Latest (Branches)
-      # ==============================
       - name: Tag Latest
         if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
 
-      # ==============================
-      # Tag Version (Tags)
-      # ==============================
       - name: Tag Version
         if: env.IS_TAG == 'true'
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
           docker push pythoncodelife/backend-auth-service:$TAG
 
-      # ==============================
-      # Email Success
-      # ==============================
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -129,9 +88,9 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
           subject: "CI SUCCESS - backend-auth-service"
-          to: ${{ secrets.MAIL_CC_STAGING }}
+          to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
           body: |
             CI SUCCESS
@@ -139,16 +98,12 @@ jobs:
             Ref: ${{ env.REF }}
             Commit: ${{ env.COMMIT }}
 
-            Type: ${{ env.IS_TAG }}
             Branch: ${{ env.BRANCH }}
             Tag: ${{ env.TAG }}
 
             Image:
             ${{ env.IMAGE }}
 
-      # ==============================
-      # Email Failure
-      # ==============================
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
@@ -156,9 +111,9 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
           subject: "CI FAILED - backend-auth-service"
-          to: ${{ secrets.MAIL_CC_STAGING }}
+          to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
           body: |
             CI FAILED
@@ -166,4 +121,4 @@ jobs:
             Ref: ${{ env.REF }}
             Commit: ${{ env.COMMIT }}
 
-            Check GitHub Actions logs immediately.
+            Check logs in GitHub Actions
