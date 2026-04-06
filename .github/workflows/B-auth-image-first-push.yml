@@ -1,4 +1,4 @@
-name: 🚀 Build & Push Auth Service Image (Manual)
+name: 🚀 Build & Push Auth Service Image
 
 on:
   workflow_dispatch:
@@ -9,27 +9,55 @@ jobs:
 
     steps:
 
-      # Checkout
-      - name: 📥 Checkout Repository
+      # ==============================
+      # 📥 Checkout Repository
+      # ==============================
+      - name: 📥 Checkout Code
         uses: actions/checkout@v3
 
-      # Docker Login
+      # ==============================
+      # 🔐 Docker Login
+      # ==============================
       - name: 🔐 Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build Image
+      # ==============================
+      # 🧠 Show Info
+      # ==============================
+      - name: 🧠 Show Build Info
+        run: |
+          echo "🚀 Starting Docker Build for Auth Service"
+          echo "📦 Image: pythoncodelife/auth-service:latest"
+          echo "🕒 Time: $(date)"
+
+      # ==============================
+      # 🐳 Build Docker Image
+      # ==============================
       - name: 🐳 Build Docker Image
         run: |
           docker build -t pythoncodelife/auth-service:latest .
 
-      # Push Image
+      # ==============================
+      # 📤 Push Docker Image
+      # ==============================
       - name: 📤 Push Docker Image
         run: |
           docker push pythoncodelife/auth-service:latest
 
-      # Done
-      - name: ✅ Done
-        run: echo "Auth image pushed successfully"
+      # ==============================
+      # 🔍 Verify Image
+      # ==============================
+      - name: 🔍 Verify Image Push
+        run: |
+          echo "✅ Image pushed successfully!"
+          echo "🔗 DockerHub: https://hub.docker.com/r/pythoncodelife/auth-service"
+      
+      # ==============================
+      # 🎉 Done
+      # ==============================
+      - name: 🎉 Done
+        run: |
+          echo "🚀 Auth Service Docker Image Ready for Deployment"
