@@ -15,22 +15,27 @@ jobs:
 
     steps:
 
+      # 🟢 Checkout
       - name: Checkout
         uses: actions/checkout@v3
 
+      # 🟢 Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # 🟢 Install deps
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest
 
+      # 🟢 Tests
       - name: Run Tests
         run: pytest
 
+      # 🟢 Detect context
       - name: Detect Context
         run: |
           echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
@@ -38,38 +43,47 @@ jobs:
           echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
 
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "IS_TAG=true" >> $GITHUB_ENV
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            VERSION=${GITHUB_REF#refs/tags/}
           else
-            echo "IS_TAG=false" >> $GITHUB_ENV
-            echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+            VERSION=dev-${GITHUB_SHA}
           fi
 
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "APP_COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
+
+      # 🟢 Docker login
       - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
           -u "${{ secrets.DOCKERHUB_USERNAME }}" \
           --password-stdin
 
+      # 🟢 Build image (IMPORTANT)
       - name: Build Image
-        run: docker build -t $IMAGE .
+        run: |
+          docker build \
+          --build-arg APP_VERSION=${APP_VERSION} \
+          --build-arg APP_COMMIT=${APP_COMMIT} \
+          -t $IMAGE .
 
+      # 🟢 Push SHA
       - name: Push SHA Image
         run: docker push $IMAGE
 
+      # 🟢 Tag latest
       - name: Tag Latest
-        if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
 
+      # 🟢 Tag version
       - name: Tag Version
-        if: env.IS_TAG == 'true'
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
-          docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
-          docker push pythoncodelife/backend-auth-service:$TAG
+          docker tag $IMAGE pythoncodelife/backend-auth-service:${APP_VERSION}
+          docker push pythoncodelife/backend-auth-service:${APP_VERSION}
 
-      # ✅ EMAIL SUCCESS
+      # 🟢 Email success
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -81,15 +95,8 @@ jobs:
           subject: "CI SUCCESS - backend-auth-service"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            CI SUCCESS
 
-            Ref: ${{ env.REF }}
-            Commit: ${{ env.COMMIT }}
-            Branch: ${{ env.BRANCH }}
-            Tag: ${{ env.TAG }}
-
-      # ❌ EMAIL FAILURE
+      # 🔴 Email failure
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
@@ -101,8 +108,3 @@ jobs:
           subject: "CI FAILED - backend-auth-service"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            CI FAILED
-
-            Ref: ${{ env.REF }}
-            Commit: ${{ env.COMMIT }}
