@@ -3,7 +3,7 @@ name: CD - Render Deploy (Latest)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 20 * * *"
+    - cron: "30 20 * * *"   # 2 AM IST
 
 jobs:
   deploy:
@@ -11,16 +11,25 @@ jobs:
 
     steps:
 
+      # ==============================
+      # Checkout Code
+      # ==============================
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
+      # ==============================
+      # Fetch Tags
+      # ==============================
       - name: Fetch Tags
         run: |
           echo "Fetching tags..."
           git fetch --tags
 
+      # ==============================
+      # Detect Latest Tag
+      # ==============================
       - name: Detect Latest Tag
         run: |
           TAGS=($(git tag --sort=-v:refname))
@@ -28,21 +37,31 @@ jobs:
           echo "LATEST=$LATEST" >> $GITHUB_ENV
           echo "Latest tag: $LATEST"
 
+      # ==============================
+      # Deploy to Render
+      # ==============================
       - name: Deploy to Render
         run: |
           echo "Triggering Render deploy..."
           curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
+      # ==============================
+      # Wait for Deployment
+      # ==============================
       - name: Wait
         run: |
           echo "Waiting for deployment..."
           sleep 40
 
+      # ==============================
+      # Health Check
+      # ==============================
       - name: Health Check
         run: |
-          URL="https://backend-auth-service.onrender.com"
+          URL="https://backend-auth-service-ks6f.onrender.com/"
           RESPONSE=$(curl -s $URL)
 
+          echo "URL: $URL"
           echo "Response: $RESPONSE"
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
@@ -52,8 +71,13 @@ jobs:
             exit 1
           fi
 
+      # ==============================
+      # Summary
+      # ==============================
       - name: Summary
         run: |
+          echo "=============================="
           echo "CD DONE"
           echo "Latest Tag: $LATEST"
           echo "Deployed: latest image"
+          echo "=============================="
