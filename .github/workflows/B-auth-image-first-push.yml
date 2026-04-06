@@ -1,4 +1,4 @@
-name: 🚀 Build & Push Auth Service Image
+name: 🚀 Build & Push First ---> Auth Service Image
 
 on:
   workflow_dispatch:
