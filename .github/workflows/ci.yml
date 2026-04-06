@@ -1,4 +1,4 @@
-name: 🚀 CI - Build, Test & Push Docker (backend-auth-service)
+name: CI - Build, Test & Push Docker (backend-auth-service)
 
 on:
   push:
@@ -17,88 +17,51 @@ on:
 
 jobs:
   build:
-    name: 🚀 CI Build - ${{ github.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
-      # ==============================
-      # 📥 Checkout Code
-      # ==============================
-      - name: 📥 Checkout Code
+
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      # ==============================
-      # 🐍 Setup Python
-      # ==============================
-      - name: 🐍 Setup Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # ==============================
-      # 📦 Install Dependencies
-      # ==============================
-      - name: 📦 Install Dependencies
+      - name: Install Dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest
 
-      # ==============================
-      # 🧪 Run Tests
-      # ==============================
-      - name: 🧪 Run Tests
+      - name: Run Tests
         run: |
-          echo "🧪 Running Pytest..."
           pytest
 
-      # ==============================
-      # 🧠 Metadata
-      # ==============================
-      - name: 🧠 Set Metadata
+      - name: Set Metadata
         run: |
           echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # ==============================
-      # 🔐 Docker Login
-      # ==============================
-      - name: 🔐 Docker Login
+      - name: Docker Login
         run: |
-          echo "${{ secrets.DOCKERHUB_USERNAME }}" | docker login \
-          -u "${{ secrets.DOCKERHUB_TOKEN }}" \
-          --password-stdin
+          USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN=${{ secrets.DOCKERHUB_TOKEN }}
+          echo "$TOKEN" | docker login -u "$USERNAME" --password-stdin
 
-      # ==============================
-      # 🐳 Build Image
-      # ==============================
-      - name: 🐳 Build Image
+      - name: Build Image
         run: docker build -t $IMAGE .
 
-      # ==============================
-      # 📤 Push SHA Image
-      # ==============================
-      - name: 📤 Push SHA Image
+      - name: Push SHA Image
         run: docker push $IMAGE
 
-      # ==============================
-      # 🔁 Tag Latest
-      # ==============================
-      - name: 🔁 Tag Latest
+      - name: Tag Latest
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
 
-      # ==============================
-      # 🏷️ Tag Version
-      # ==============================
-      - name: 🏷️ Tag Version
+      - name: Tag Version
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
           docker push pythoncodelife/backend-auth-service:$TAG
-
-      # ==============================
-      # 🎉 Done
-      # ==============================
-      - name: 🎉 CI Done
-        run: echo "🚀 CI Completed Successfully"
