@@ -1,4 +1,6 @@
-# 🟢 APP FACTORY – FINAL VERSION (CI/CD READY)
+# =====================================================
+# 🟦 APP FACTORY – FINAL VERSION (CI/CD READY)
+# =====================================================
 
 import os
 import logging
@@ -8,6 +10,7 @@ from flask import Flask, jsonify
 from .config import Config
 from .extensions import db, migrate, jwt, cors
 
+# Import models for Alembic
 from .models.user import User
 from .models.token_blacklist import TokenBlocklist
 
@@ -15,22 +18,30 @@ from .models.token_blacklist import TokenBlocklist
 def create_app(testing: bool = False):
     app = Flask(__name__)
 
-    # 🟢 Load config
+    # --------------------------
+    # 🔹 Load config
+    # --------------------------
     app.config.from_object(Config)
 
-    # 🟢 Testing override
+    # --------------------------
+    # 🔹 Testing override
+    # --------------------------
     if testing:
         app.config["TESTING"] = True
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         app.config["JWT_SECRET_KEY"] = "test-secret"
 
-    # 🟢 Init extensions
+    # --------------------------
+    # 🔹 Init extensions
+    # --------------------------
     cors.init_app(app)
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
 
-    # 🟢 Logging
+    # --------------------------
+    # 🔹 Logging setup
+    # --------------------------
     logs_path = os.path.join(os.getcwd(), "logs")
     os.makedirs(logs_path, exist_ok=True)
 
@@ -50,28 +61,34 @@ def create_app(testing: bool = False):
         app.logger.addHandler(handler)
 
     app.logger.setLevel(logging.INFO)
-    app.logger.info("Auth service starting...")
+    app.logger.info("🚀 Auth service starting...")
 
-    # 🟢 Register routes
+    # --------------------------
+    # 🔹 Register routes
+    # --------------------------
     from .api.auth_routes import auth_bp
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
 
-    # 🟢 HEALTH CHECK (DYNAMIC)
+    # --------------------------
+    # 🔥 HEALTH CHECK (FINAL)
+    # --------------------------
     @app.get("/")
     def health():
         return jsonify({
             "status": "Auth service running",
 
-            # 🔥 Dynamic CI/CD values
-            "version": os.getenv("APP_VERSION", "local"),
-            "commit": os.getenv("APP_COMMIT", "local")
+            # 🔥 Dynamic values from CI/CD (IMPORTANT)
+            "version": os.getenv("APP_VERSION", "unknown"),
+            "commit": os.getenv("APP_COMMIT", "unknown")
         }), 200
 
-    # 🟢 JWT Blacklist
+    # --------------------------
+    # 🔹 JWT Blacklist
+    # --------------------------
     @jwt.token_in_blocklist_loader
     def token_revoked(jwt_header, jwt_payload):
         jti = jwt_payload.get("jti")
         return TokenBlocklist.query.filter_by(jti=jti).first() is not None
 
-    app.logger.info("Auth service started successfully.")
+    app.logger.info("✅ Auth service started successfully.")
     return app
