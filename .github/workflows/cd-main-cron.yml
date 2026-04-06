@@ -3,7 +3,7 @@ name: CD - Render Deploy (Latest)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 20 * * *"   # 2 AM IST
+    - cron: "30 20 * * *"
 
 jobs:
   deploy:
@@ -11,73 +11,63 @@ jobs:
 
     steps:
 
-      # ==============================
-      # Checkout Code
-      # ==============================
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # ==============================
-      # Fetch Tags
-      # ==============================
       - name: Fetch Tags
         run: |
-          echo "Fetching tags..."
           git fetch --tags
 
-      # ==============================
-      # Detect Latest Tag
-      # ==============================
       - name: Detect Latest Tag
         run: |
           TAGS=($(git tag --sort=-v:refname))
           LATEST=${TAGS[0]}
           echo "LATEST=$LATEST" >> $GITHUB_ENV
-          echo "Latest tag: $LATEST"
 
-      # ==============================
-      # Deploy to Render
-      # ==============================
       - name: Deploy to Render
         run: |
-          echo "Triggering Render deploy..."
           curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
-      # ==============================
-      # Wait for Deployment
-      # ==============================
       - name: Wait
-        run: |
-          echo "Waiting for deployment..."
-          sleep 40
+        run: sleep 40
 
-      # ==============================
-      # Health Check
-      # ==============================
       - name: Health Check
         run: |
           URL="https://backend-auth-service-ks6f.onrender.com/"
           RESPONSE=$(curl -s $URL)
 
-          echo "URL: $URL"
           echo "Response: $RESPONSE"
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
-            echo "Deployment success"
+            echo "STATUS=success" >> $GITHUB_ENV
           else
-            echo "Deployment failed"
+            echo "STATUS=fail" >> $GITHUB_ENV
             exit 1
           fi
 
-      # ==============================
-      # Summary
-      # ==============================
       - name: Summary
         run: |
-          echo "=============================="
           echo "CD DONE"
           echo "Latest Tag: $LATEST"
-          echo "Deployed: latest image"
-          echo "=============================="
+          echo "Status: $STATUS"
+
+      # 📧 Email (always CC only)
+      - name: Email CD Status
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          subject: "CD STATUS - backend-auth-service"
+          to: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            CD Completed
+
+            Latest Tag: $LATEST
+            Status: $STATUS
+            URL: https://backend-auth-service-ks6f.onrender.com/
