@@ -1,0 +1,36 @@
+name: 🚀 Manual Auth DB Migration (Supabase)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Checkout
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v3
+
+      # Setup Python
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # Install Dependencies
+      - name: 📦 Install Requirements
+        run: |
+          pip install -r requirements.txt
+
+      # Run Migration
+      - name: 🧱 Run Flask DB Upgrade
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          flask db upgrade
+
+      # Done
+      - name: ✅ Done
+        run: echo "Auth DB Migration completed"
