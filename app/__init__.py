@@ -75,7 +75,7 @@ def create_app(testing: bool = False):
     @app.get("/")
     def health():
         return jsonify({
-            "status": "Auth service started successfully UP and Running Now.",
+            "status": "Auth service started successfully UP and Running Now CD on main updated with Rollbacks and Email Support also from now.",
 
             # ✅ CI/CD values (safe fallback)
             # "version": os.getenv("APP_VERSION", "local"),
