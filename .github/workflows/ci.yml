@@ -15,93 +15,155 @@ jobs:
 
     steps:
 
+      # ==============================
+      # Checkout Code
+      # ==============================
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      # ==============================
+      # Setup Python
+      # ==============================
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # ==============================
+      # Install Dependencies
+      # ==============================
       - name: Install Dependencies
         run: |
           echo "Installing dependencies..."
           pip install -r requirements.txt
           pip install pytest
 
+      # ==============================
+      # Run Tests
+      # ==============================
       - name: Run Tests
         run: |
           echo "Running tests..."
           pytest
 
-      - name: Detect Branch / Tag
+      # ==============================
+      # Detect Branch / Tag
+      # ==============================
+      - name: Detect Context
         run: |
-          echo "REF: $GITHUB_REF"
-          echo "COMMIT: $GITHUB_SHA"
-
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            TAG=${GITHUB_REF#refs/tags/}
-            echo "TAG=$TAG" >> $GITHUB_ENV
-            echo "TYPE=tag" >> $GITHUB_ENV
-            echo "Tag build: $TAG"
-          else
-            BRANCH=${GITHUB_REF#refs/heads/}
-            echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-            echo "TYPE=branch" >> $GITHUB_ENV
-            echo "Branch build: $BRANCH"
-          fi
-
-      - name: Set Image
-        run: |
+          echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
+          echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
           echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
 
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "IS_TAG=true" >> $GITHUB_ENV
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "IS_TAG=false" >> $GITHUB_ENV
+            echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          fi
+
+      # ==============================
+      # Logs
+      # ==============================
+      - name: Show Execution Info
+        run: |
+          echo "CI TRIGGERED"
+          echo "Ref: $REF"
+          echo "Commit: $COMMIT"
+
+          if [ "$IS_TAG" = "true" ]; then
+            echo "Type: TAG BUILD"
+            echo "Tag: $TAG"
+          else
+            echo "Type: BRANCH BUILD"
+            echo "Branch: $BRANCH"
+          fi
+
+      # ==============================
+      # Docker Login
+      # ==============================
       - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
           -u "${{ secrets.DOCKERHUB_USERNAME }}" \
           --password-stdin
 
+      # ==============================
+      # Build Image
+      # ==============================
       - name: Build Image
         run: docker build -t $IMAGE .
 
+      # ==============================
+      # Push SHA Image
+      # ==============================
       - name: Push SHA Image
         run: docker push $IMAGE
 
+      # ==============================
+      # Tag Latest (Branches)
+      # ==============================
       - name: Tag Latest
+        if: env.IS_TAG == 'false'
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
 
+      # ==============================
+      # Tag Version (Tags)
+      # ==============================
       - name: Tag Version
-        if: env.TYPE == 'tag'
+        if: env.IS_TAG == 'true'
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
           docker push pythoncodelife/backend-auth-service:$TAG
 
-      - name: Summary
-        run: |
-          echo "CI DONE"
-          echo "Type: $TYPE"
-          echo "Branch: $BRANCH"
-          echo "Tag: $TAG"
-          echo "Image: $IMAGE"
-
-      # 📧 Email (always CC only)
-      - name: Email CI Status
-        if: always()
+      # ==============================
+      # Email Success
+      # ==============================
+      - name: Email Success
+        if: success()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "CI STATUS - backend-auth-service"
+          subject: "CI SUCCESS - backend-auth-service"
           to: ${{ secrets.MAIL_CC_STAGING }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
           body: |
-            CI Completed
+            CI SUCCESS
 
-            Type: $TYPE
-            Branch: $BRANCH
-            Tag: $TAG
-            Image: $IMAGE
+            Ref: ${{ env.REF }}
+            Commit: ${{ env.COMMIT }}
+
+            Type: ${{ env.IS_TAG }}
+            Branch: ${{ env.BRANCH }}
+            Tag: ${{ env.TAG }}
+
+            Image:
+            ${{ env.IMAGE }}
+
+      # ==============================
+      # Email Failure
+      # ==============================
+      - name: Email Failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          subject: "CI FAILED - backend-auth-service"
+          to: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            CI FAILED
+
+            Ref: ${{ env.REF }}
+            Commit: ${{ env.COMMIT }}
+
+            Check GitHub Actions logs immediately.
