@@ -30,6 +30,11 @@ jobs:
           echo "PREV_TAG=$PREVIOUS" >> $GITHUB_ENV
 
           echo "URL=https://backend-auth-service-ks6f.onrender.com/" >> $GITHUB_ENV
+          echo "REPO=https://github.com/raghunadhbr-git/backend-auth-service" >> $GITHUB_ENV
+          echo "DOCKER=https://hub.docker.com/r/pythoncodelife/backend-auth-service" >> $GITHUB_ENV
+
+          COMMIT=$(git rev-list -n 1 $LATEST)
+          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
 
       - name: Deploy Latest
         run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
@@ -68,7 +73,7 @@ jobs:
             exit 1
           fi
 
-      # ✅ EMAIL SUCCESS
+      # ✅ EMAIL SUCCESS (ENHANCED)
       - name: Email Success
         if: success() && env.STATUS == 'success'
         uses: dawidd6/action-send-mail@v3
@@ -77,9 +82,25 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "CD SUCCESS - ${{ env.TAG }}"
+          subject: "🚀 CD SUCCESS - ${{ env.TAG }}"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            🚀 DEPLOYMENT SUCCESS
+
+            🏷️ Tag: ${{ env.TAG }}
+            🔑 Commit SHA: ${{ env.COMMIT }}
+
+            🔗 GitHub Repo:
+            ${{ env.REPO }}
+
+            🐳 Docker Image:
+            ${{ env.DOCKER }}
+
+            🌐 Health Check URL:
+            ${{ env.URL }}
+
+            👉 Click the URL above to verify service is running
 
       # ⚠️ ROLLBACK SUCCESS
       - name: Email Rollback
@@ -90,9 +111,17 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "ROLLBACK SUCCESS - ${{ env.PREV_TAG }}"
+          subject: "⚠️ ROLLBACK SUCCESS - ${{ env.PREV_TAG }}"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            ⚠️ ROLLBACK SUCCESS
+
+            ❌ Failed Tag: ${{ env.TAG }}
+            🔁 Rolled back to: ${{ env.PREV_TAG }}
+
+            🌐 Service URL:
+            ${{ env.URL }}
 
       # ❌ FINAL FAILURE
       - name: Email Failure
@@ -103,6 +132,16 @@ jobs:
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "CD FAILED"
+          subject: "🚨 CD FAILED - ACTION REQUIRED"
           to: ${{ secrets.MAIL_TO_CC_MAIN }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            🚨 DEPLOYMENT FAILED
+
+            ❌ Latest Tag Failed: ${{ env.TAG }}
+            ❌ Previous Tag Failed: ${{ env.PREV_TAG }}
+
+            🔧 Manual intervention required
+
+            🌐 URL:
+            ${{ env.URL }}
