@@ -1,4 +1,4 @@
-name: 🚀 CI - Build, Test & Push Docker
+name: 🚀 CI - Build & Push (backend-auth-service)
 
 on:
   push:
@@ -7,181 +7,62 @@ on:
     tags:
       - "v*"
 
-  create:
-    tags:
-      - "v*"
-
-  pull_request:
-
-  workflow_dispatch:
-
 jobs:
   build:
-    name: 🚀 CI Build - ${{ github.ref_name }}
     runs-on: ubuntu-latest
 
     steps:
 
-      # ==============================
+      # ===============================
       # 🟢 Checkout
-      # ==============================
-      - name: 🟢 Checkout Code
+      # ===============================
+      - name: Checkout
         uses: actions/checkout@v3
 
-      # ==============================
-      # 🟢 Setup Python
-      # ==============================
-      - name: 🟢 Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      # ==============================
-      # 🟢 Install Dependencies
-      # ==============================
-      - name: 🟢 Install Dependencies
+      # ===============================
+      # 🟢 Set Version Info
+      # ===============================
+      - name: Set Version
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
-
-      # ==============================
-      # 🟢 Run Tests
-      # ==============================
-      - name: 🟢 Run Tests
-        run: |
-          echo "🧪 Running Pytest..."
-          pytest
-
-      # ==============================
-      # 🟢 Metadata
-      # ==============================
-      - name: 🟢 Set Metadata
-        run: |
-          echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
-          echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "REPO=https://github.com/raghunadhbr-git/backend-auth-service" >> $GITHUB_ENV
-          echo "DOCKER=https://hub.docker.com/r/pythoncodelife/backend-auth-service" >> $GITHUB_ENV
-
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "TYPE=TAG" >> $GITHUB_ENV
-            echo "NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            VERSION=${GITHUB_REF#refs/tags/}
           else
-            echo "TYPE=BRANCH" >> $GITHUB_ENV
-            echo "NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+            VERSION=dev-${GITHUB_SHA}
           fi
 
-      # ==============================
-      # 🟢 Logs
-      # ==============================
-      - name: 🟢 Show Info
-        run: |
-          echo "🚀 CI STARTED"
-          echo "Type: $TYPE"
-          echo "Name: $NAME"
-          echo "Commit: $COMMIT"
-          echo "Image: $IMAGE"
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "APP_COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # ==============================
+      # ===============================
       # 🟢 Docker Login
-      # ==============================
-      - name: 🟢 Docker Login
+      # ===============================
+      - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
           -u "${{ secrets.DOCKERHUB_USERNAME }}" \
           --password-stdin
 
-      # ==============================
-      # 🟢 Build Image
-      # ==============================
-      - name: 🟢 Build Image
-        run: docker build -t $IMAGE .
+      # ===============================
+      # 🔥 Build Image (IMPORTANT FIX)
+      # ===============================
+      - name: Build Image
+        run: |
+          docker build \
+          --build-arg APP_VERSION=${APP_VERSION} \
+          --build-arg APP_COMMIT=${APP_COMMIT} \
+          -t $IMAGE .
 
-      # ==============================
-      # 🟢 Push SHA Image
-      # ==============================
-      - name: 🟢 Push SHA
+      # ===============================
+      # 🟢 Push Image
+      # ===============================
+      - name: Push Image
         run: docker push $IMAGE
 
-      # ==============================
-      # 🟢 Tag Latest (Branches)
-      # ==============================
-      - name: 🟢 Tag Latest
-        if: env.TYPE == 'BRANCH'
+      # ===============================
+      # 🟢 Tag Latest
+      # ===============================
+      - name: Tag Latest
         run: |
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
-
-      # ==============================
-      # 🟢 Tag Version (Tags)
-      # ==============================
-      - name: 🟢 Tag Version
-        if: env.TYPE == 'TAG'
-        run: |
-          docker tag $IMAGE pythoncodelife/backend-auth-service:${NAME}
-          docker push pythoncodelife/backend-auth-service:${NAME}
-
-      # ==============================
-      # 📧 SUCCESS EMAIL (FIXED)
-      # ==============================
-      - name: 📧 Email Success
-        if: success()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_MAIN }}
-          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "🚀 CI SUCCESS - ${{ env.NAME }}"
-          to: ${{ secrets.MAIL_USERNAME_MAIN }}
-          cc: ${{ secrets.MAIL_TO_CC_MAIN }}
-          from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            🚀 CI BUILD SUCCESS
-
-            📌 Type: ${{ env.TYPE }}
-            🏷️ Name: ${{ env.NAME }}
-
-            🔑 Commit SHA:
-            ${{ env.COMMIT }}
-
-            🐳 Docker Image:
-            ${{ env.IMAGE }}
-
-            🔗 GitHub Repo:
-            ${{ env.REPO }}
-
-            🐳 Docker Hub:
-            ${{ env.DOCKER }}
-
-            👉 Build & Push completed successfully
-
-      # ==============================
-      # ❌ FAILURE EMAIL
-      # ==============================
-      - name: ❌ Email Failure
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_MAIN }}
-          password: ${{ secrets.MAIL_PASSWORD_MAIN }}
-          subject: "🚨 CI FAILED - ${{ env.NAME }}"
-          to: ${{ secrets.MAIL_USERNAME_MAIN }}
-          cc: ${{ secrets.MAIL_TO_CC_MAIN }}
-          from: ${{ secrets.MAIL_USERNAME_MAIN }}
-          body: |
-            🚨 CI BUILD FAILED
-
-            📌 Type: ${{ env.TYPE }}
-            🏷️ Name: ${{ env.NAME }}
-
-            🔑 Commit SHA:
-            ${{ env.COMMIT }}
-
-            🔗 Repo:
-            ${{ env.REPO }}
-
-            🔧 Check GitHub Actions logs
