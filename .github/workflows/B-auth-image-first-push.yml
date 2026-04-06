@@ -1,4 +1,4 @@
-name: 🚀 Build & Push First ---> Auth Service Image
+name: 🚀 Build & Push First ---> backend-auth-service image
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
       - name: 🧠 Show Build Info
         run: |
           echo "🚀 Starting Docker Build for Auth Service"
-          echo "📦 Image: pythoncodelife/auth-service:latest"
+          echo "📦 Image: pythoncodelife/backend-auth-service:latest"
           echo "🕒 Time: $(date)"
 
       # ==============================
@@ -38,14 +38,14 @@ jobs:
       # ==============================
       - name: 🐳 Build Docker Image
         run: |
-          docker build -t pythoncodelife/auth-service:latest .
+          docker build -t pythoncodelife/backend-auth-service:latest .
 
       # ==============================
       # 📤 Push Docker Image
       # ==============================
       - name: 📤 Push Docker Image
         run: |
-          docker push pythoncodelife/auth-service:latest
+          docker push pythoncodelife/backend-auth-service:latest
 
       # ==============================
       # 🔍 Verify Image
@@ -53,11 +53,11 @@ jobs:
       - name: 🔍 Verify Image Push
         run: |
           echo "✅ Image pushed successfully!"
-          echo "🔗 DockerHub: https://hub.docker.com/r/pythoncodelife/auth-service"
+          echo "🔗 DockerHub: https://hub.docker.com/r/pythoncodelife/backend-auth-service"
       
       # ==============================
       # 🎉 Done
       # ==============================
       - name: 🎉 Done
         run: |
-          echo "🚀 Auth Service Docker Image Ready for Deployment"
+          echo "🚀 backend-auth-service Docker Image Ready for Deployment"
