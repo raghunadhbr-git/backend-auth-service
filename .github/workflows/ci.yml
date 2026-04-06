@@ -1,4 +1,4 @@
-name: CI - Build, Test & Push Docker (backend-auth-service)
+name: CI - Build, Test & Push Docker (backend-auth-service)  
 
 on:
   push:
