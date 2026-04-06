@@ -1,4 +1,4 @@
-name: CD - Render Deploy (Latest)
+name: CD - Render Deploy (Latest Tag + Rollback)
 
 on:
   workflow_dispatch:
@@ -11,63 +11,174 @@ jobs:
 
     steps:
 
+      # ==============================
+      # Checkout
+      # ==============================
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
+      # ==============================
+      # Fetch Tags
+      # ==============================
       - name: Fetch Tags
-        run: |
-          git fetch --tags
+        run: git fetch --tags
 
-      - name: Detect Latest Tag
+      # ==============================
+      # Detect Tags
+      # ==============================
+      - name: Detect Tags
         run: |
           TAGS=($(git tag --sort=-v:refname))
-          LATEST=${TAGS[0]}
-          echo "LATEST=$LATEST" >> $GITHUB_ENV
 
-      - name: Deploy to Render
+          LATEST=${TAGS[0]}
+          PREVIOUS=${TAGS[1]}
+
+          echo "TAG=$LATEST" >> $GITHUB_ENV
+          echo "PREV_TAG=$PREVIOUS" >> $GITHUB_ENV
+
+          echo "IMAGE=pythoncodelife/backend-auth-service:latest" >> $GITHUB_ENV
+          echo "URL=https://backend-auth-service-ks6f.onrender.com/" >> $GITHUB_ENV
+
+          COMMIT=$(git rev-list -n 1 $LATEST)
+          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
+
+          echo "Latest tag: $LATEST"
+          echo "Previous tag: $PREVIOUS"
+
+      # ==============================
+      # Deploy Latest (Render)
+      # ==============================
+      - name: Deploy Latest
         run: |
+          echo "🚀 Deploying latest image..."
           curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
+      # ==============================
+      # Wait
+      # ==============================
       - name: Wait
         run: sleep 40
 
-      - name: Health Check
+      # ==============================
+      # Health Check Latest
+      # ==============================
+      - name: Health Check Latest
+        id: health_latest
         run: |
-          URL="https://backend-auth-service-ks6f.onrender.com/"
           RESPONSE=$(curl -s $URL)
-
-          echo "Response: $RESPONSE"
+          echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
             echo "STATUS=success" >> $GITHUB_ENV
+            exit 0
           else
             echo "STATUS=fail" >> $GITHUB_ENV
             exit 1
           fi
 
-      - name: Summary
+      # ==============================
+      # Rollback (Retry deploy)
+      # ==============================
+      - name: Rollback Deploy
+        if: failure()
         run: |
-          echo "CD DONE"
-          echo "Latest Tag: $LATEST"
-          echo "Status: $STATUS"
+          echo "⚠️ First deploy failed. Retrying..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
-      # 📧 Email (always CC only)
-      - name: Email CD Status
-        if: always()
+      - name: Wait Rollback
+        if: failure()
+        run: sleep 40
+
+      - name: Health Check Rollback
+        if: failure()
+        run: |
+          RESPONSE=$(curl -s $URL)
+          echo "PREV_RESPONSE=$RESPONSE" >> $GITHUB_ENV
+
+          if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
+            echo "FALLBACK_STATUS=success" >> $GITHUB_ENV
+            exit 0
+          else
+            echo "FALLBACK_STATUS=fail" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      # ==============================
+      # Email Success
+      # ==============================
+      - name: Email Success
+        if: success() && env.STATUS == 'success'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME_MAIN }}
           password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "CD STATUS - backend-auth-service"
+          subject: "CD SUCCESS - ${{ env.TAG }}"
           to: ${{ secrets.MAIL_CC_STAGING }}
           from: ${{ secrets.MAIL_USERNAME_MAIN }}
           body: |
-            CD Completed
+            CD SUCCESS
 
-            Latest Tag: $LATEST
-            Status: $STATUS
-            URL: https://backend-auth-service-ks6f.onrender.com/
+            Tag: ${{ env.TAG }}
+            Commit: ${{ env.COMMIT }}
+            Image: ${{ env.IMAGE }}
+
+            URL:
+            ${{ env.URL }}
+
+            Response:
+            ${{ env.RESPONSE }}
+
+      # ==============================
+      # Email Fallback Success
+      # ==============================
+      - name: Email Rollback Success
+        if: env.FALLBACK_STATUS == 'success'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          subject: "ROLLBACK SUCCESS - ${{ env.PREV_TAG }}"
+          to: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            FALLBACK SUCCESS
+
+            Failed Tag: ${{ env.TAG }}
+            Rolled back to: ${{ env.PREV_TAG }}
+
+            URL:
+            ${{ env.URL }}
+
+      # ==============================
+      # Email Final Failure
+      # ==============================
+      - name: Email Final Failure
+        if: failure() && env.FALLBACK_STATUS == 'fail'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          subject: "CD FAILED - ACTION REQUIRED"
+          to: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            BOTH DEPLOYS FAILED
+
+            Latest Tag Failed: ${{ env.TAG }}
+            Previous Tag Failed: ${{ env.PREV_TAG }}
+
+            Manual intervention required.
+
+      # ==============================
+      # Done
+      # ==============================
+      - name: Done
+        run: echo "CD Flow Completed"
