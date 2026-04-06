@@ -1,4 +1,4 @@
-name: 🚀 CI - Build, Test & Push Docker
+name: 🚀 CI - Build, Test & Push Docker (backend-auth-service)
 
 on:
   push:
@@ -14,11 +14,6 @@ on:
   pull_request:
 
   workflow_dispatch:
-    inputs:
-      environment:
-        description: "Select environment (dev/staging/prod)"
-        required: false
-        default: "dev"
 
 jobs:
   build:
@@ -26,115 +21,84 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🟢 Checkout Code
-      - name: 🟢 Checkout Code
+      # ==============================
+      # 📥 Checkout Code
+      # ==============================
+      - name: 📥 Checkout Code
         uses: actions/checkout@v3
 
-      # 🟢 Setup Python
-      - name: 🟢 Setup Python
+      # ==============================
+      # 🐍 Setup Python
+      # ==============================
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # 🟢 Install Dependencies
-      - name: 🟢 Install Dependencies
+      # ==============================
+      # 📦 Install Dependencies
+      # ==============================
+      - name: 📦 Install Dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
 
-      # 🟢 Run Pytest (VERY IMPORTANT)
-      - name: 🟢 Run Tests (Pytest)
+      # ==============================
+      # 🧪 Run Tests
+      # ==============================
+      - name: 🧪 Run Tests
         run: |
           echo "🧪 Running Pytest..."
           pytest
 
-      # 🟢 Set Metadata
-      - name: 🟢 Set Metadata
+      # ==============================
+      # 🧠 Metadata
+      # ==============================
+      - name: 🧠 Set Metadata
         run: |
-          echo "REF=${GITHUB_REF}" >> $GITHUB_ENV
-          echo "COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "IMAGE=pythoncodelife/auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
+          echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
 
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "IS_TAG=true" >> $GITHUB_ENV
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          else
-            echo "IS_TAG=false" >> $GITHUB_ENV
-            echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
-          fi
-
-      # 🟢 Show Logs
-      - name: 🟢 Show Execution Info
+      # ==============================
+      # 🔐 Docker Login
+      # ==============================
+      - name: 🔐 Docker Login
         run: |
-          echo "🚀 CI TRIGGERED"
-          echo "Ref: $REF"
-          echo "Commit: $COMMIT"
-
-          if [ "$IS_TAG" = "true" ]; then
-            echo "🏷️ Type: TAG BUILD"
-            echo "Tag: $TAG"
-          else
-            echo "🌿 Type: BRANCH BUILD"
-            echo "Branch: $BRANCH"
-          fi
-
-      # 🟢 Docker Login
-      - name: 🟢 Docker Login
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN_COMMON }}" | docker login \
-          -u "${{ secrets.DOCKERHUB_USERNAME_COMMON }}" \
+          echo "${{ secrets.DOCKERHUB_USERNAME }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_TOKEN }}" \
           --password-stdin
 
-      # 🟢 Build Docker Image
-      - name: 🟢 Build Image
+      # ==============================
+      # 🐳 Build Image
+      # ==============================
+      - name: 🐳 Build Image
         run: docker build -t $IMAGE .
 
-      # 🟢 Push SHA Image
-      - name: 🟢 Push SHA Image
+      # ==============================
+      # 📤 Push SHA Image
+      # ==============================
+      - name: 📤 Push SHA Image
         run: docker push $IMAGE
 
-      # 🟢 Tag Latest (Branches)
-      - name: 🟢 Tag Latest
-        if: env.IS_TAG == 'false'
+      # ==============================
+      # 🔁 Tag Latest
+      # ==============================
+      - name: 🔁 Tag Latest
         run: |
-          docker tag $IMAGE pythoncodelife/auth-service:latest
-          docker push pythoncodelife/auth-service:latest
+          docker tag $IMAGE pythoncodelife/backend-auth-service:latest
+          docker push pythoncodelife/backend-auth-service:latest
 
-      # 🟢 Tag Version (Tags)
-      - name: 🟢 Tag Version
-        if: env.IS_TAG == 'true'
+      # ==============================
+      # 🏷️ Tag Version
+      # ==============================
+      - name: 🏷️ Tag Version
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
-          docker tag $IMAGE pythoncodelife/auth-service:${TAG}
-          docker push pythoncodelife/auth-service:${TAG}
+          TAG=${GITHUB_REF#refs/tags/}
+          docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
+          docker push pythoncodelife/backend-auth-service:$TAG
 
-      # 🟢 Email Success
-      - name: 🟢 Email Success
-        if: success()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_DEV }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "✅ CI SUCCESS 🚀"
-          to: ${{ secrets.MAIL_TO_DEV }}
-          cc: ${{ secrets.MAIL_CC_DEV }}
-          from: ${{ secrets.MAIL_USERNAME_DEV }}
-          body: |
-            CI SUCCESS 🚀
-
-            Ref: ${{ env.REF }}
-            Commit: ${{ env.COMMIT }}
-
-            Docker Image:
-            ${{ env.IMAGE }}
-
-            URL:
-            ${{ env.URL }}
-
-      # 🔴 Email Failure
-      - name: 🔴 Email Failure
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
+      # ==============================
+      # 🎉 Done
+      # ==============================
+      - name: 🎉 CI Done
+        run: echo "🚀 CI Completed Successfully"
