@@ -1,4 +1,4 @@
-name: CI - Build, Test & Push Docker (backend-auth-service)  
+name: CI - Build, Test & Push Docker (backend-auth-service)
 
 on:
   push:
@@ -21,47 +21,86 @@ jobs:
 
     steps:
 
-      - name: Checkout Code
+      - name: 📥 Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      - name: Install Dependencies
+      - name: 📦 Install Dependencies
         run: |
+          echo "📦 Installing dependencies..."
           pip install -r requirements.txt
           pip install pytest
 
-      - name: Run Tests
+      - name: 🧪 Run Tests
         run: |
+          echo "🧪 Running tests..."
           pytest
 
-      - name: Set Metadata
+      - name: 🧠 Detect Branch / Tag
+        run: |
+          echo "🔍 Detecting context..."
+          echo "REF: $GITHUB_REF"
+          echo "COMMIT: $GITHUB_SHA"
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            echo "🏷️ TAG BUILD: $TAG"
+            echo "TAG=$TAG" >> $GITHUB_ENV
+            echo "TYPE=tag" >> $GITHUB_ENV
+          else
+            BRANCH=${GITHUB_REF#refs/heads/}
+            echo "🌿 BRANCH BUILD: $BRANCH"
+            echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+            echo "TYPE=branch" >> $GITHUB_ENV
+          fi
+
+      - name: 🧠 Set Image
         run: |
           echo "IMAGE=pythoncodelife/backend-auth-service:${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "📦 Image: pythoncodelife/backend-auth-service:${GITHUB_SHA}"
 
-      - name: Docker Login
+      - name: 🔐 Docker Login
         run: |
-          USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-          TOKEN=${{ secrets.DOCKERHUB_TOKEN }}
-          echo "$TOKEN" | docker login -u "$USERNAME" --password-stdin
+          echo "🔐 Logging into DockerHub..."
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
+          -u "${{ secrets.DOCKERHUB_USERNAME }}" \
+          --password-stdin
 
-      - name: Build Image
-        run: docker build -t $IMAGE .
-
-      - name: Push SHA Image
-        run: docker push $IMAGE
-
-      - name: Tag Latest
+      - name: 🐳 Build Image
         run: |
+          echo "🐳 Building Docker image..."
+          docker build -t $IMAGE .
+
+      - name: 📤 Push SHA Image
+        run: |
+          echo "📤 Pushing SHA image..."
+          docker push $IMAGE
+
+      - name: 🔁 Tag Latest
+        run: |
+          echo "🔁 Tagging latest..."
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
+          echo "✅ Latest updated"
 
-      - name: Tag Version
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: 🏷️ Tag Version
+        if: env.TYPE == 'tag'
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
+          echo "🏷️ Tagging version..."
           docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
           docker push pythoncodelife/backend-auth-service:$TAG
+          echo "✅ Version tag pushed: $TAG"
+
+      - name: 📊 Summary
+        run: |
+          echo "================================="
+          echo "🚀 CI COMPLETED"
+          echo "Type: $TYPE"
+          echo "Branch: $BRANCH"
+          echo "Tag: $TAG"
+          echo "Image: $IMAGE"
+          echo "================================="
