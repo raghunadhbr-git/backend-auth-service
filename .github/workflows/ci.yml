@@ -62,25 +62,19 @@ jobs:
           --password-stdin
 
       - name: Build Image
-        run: |
-          echo "Building image..."
-          docker build -t $IMAGE .
+        run: docker build -t $IMAGE .
 
       - name: Push SHA Image
-        run: |
-          echo "Pushing SHA image..."
-          docker push $IMAGE
+        run: docker push $IMAGE
 
       - name: Tag Latest
         run: |
-          echo "Updating latest..."
           docker tag $IMAGE pythoncodelife/backend-auth-service:latest
           docker push pythoncodelife/backend-auth-service:latest
 
       - name: Tag Version
         if: env.TYPE == 'tag'
         run: |
-          echo "Pushing tag: $TAG"
           docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
           docker push pythoncodelife/backend-auth-service:$TAG
 
@@ -91,3 +85,23 @@ jobs:
           echo "Branch: $BRANCH"
           echo "Tag: $TAG"
           echo "Image: $IMAGE"
+
+      # 📧 Email (always CC only)
+      - name: Email CI Status
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME_MAIN }}
+          password: ${{ secrets.MAIL_PASSWORD_DEV }}
+          subject: "CI STATUS - backend-auth-service"
+          to: ${{ secrets.MAIL_CC_STAGING }}
+          from: ${{ secrets.MAIL_USERNAME_MAIN }}
+          body: |
+            CI Completed
+
+            Type: $TYPE
+            Branch: $BRANCH
+            Tag: $TAG
+            Image: $IMAGE
