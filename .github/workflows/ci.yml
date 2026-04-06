@@ -15,7 +15,7 @@ jobs:
 
     steps:
 
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Setup Python
@@ -45,18 +45,6 @@ jobs:
             echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
           fi
 
-      - name: Logs
-        run: |
-          echo "CI TRIGGERED"
-          echo "Ref: $REF"
-          echo "Commit: $COMMIT"
-
-          if [ "$IS_TAG" = "true" ]; then
-            echo "Tag build: $TAG"
-          else
-            echo "Branch build: $BRANCH"
-          fi
-
       - name: Docker Login
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login \
@@ -81,6 +69,7 @@ jobs:
           docker tag $IMAGE pythoncodelife/backend-auth-service:$TAG
           docker push pythoncodelife/backend-auth-service:$TAG
 
+      # ✅ EMAIL SUCCESS
       - name: Email Success
         if: success()
         uses: dawidd6/action-send-mail@v3
@@ -97,13 +86,10 @@ jobs:
 
             Ref: ${{ env.REF }}
             Commit: ${{ env.COMMIT }}
-
             Branch: ${{ env.BRANCH }}
             Tag: ${{ env.TAG }}
 
-            Image:
-            ${{ env.IMAGE }}
-
+      # ❌ EMAIL FAILURE
       - name: Email Failure
         if: failure()
         uses: dawidd6/action-send-mail@v3
@@ -120,5 +106,3 @@ jobs:
 
             Ref: ${{ env.REF }}
             Commit: ${{ env.COMMIT }}
-
-            Check logs in GitHub Actions
