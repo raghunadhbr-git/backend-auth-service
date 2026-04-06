@@ -1,5 +1,4 @@
-
-name: 🚀 CD - Cron Latest Tag
+name: CD - Render Deploy (Latest Image)
 
 on:
   workflow_dispatch:
@@ -11,177 +10,56 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout full repo
+
+      # ==============================
+      # 📥 Checkout (optional)
+      # ==============================
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      # Fetch tags
-      - name: Fetch Tags
-        run: git fetch --tags
-
-      # Get latest + previous tag
-      - name: Get Tags
+      # ==============================
+      # 🧠 Info Logs
+      # ==============================
+      - name: Show Info
         run: |
-          TAGS=($(git tag --sort=-v:refname))
-         
-          LATEST=${TAGS[0]}
-          PREVIOUS=${TAGS[1]}
+          echo "🚀 CD STARTED"
+          echo "⏰ Time: $(date)"
+          echo "📦 Deploying latest image from DockerHub"
 
-          echo "TAG=$LATEST" >> $GITHUB_ENV
-          echo "PREV_TAG=$PREVIOUS" >> $GITHUB_ENV
-
-          echo "IMAGE=pythoncodelife/auth-service:$LATEST" >> $GITHUB_ENV
-          echo "PREV_IMAGE=pythoncodelife/auth-service:$PREVIOUS" >> $GITHUB_ENV
-
-          echo "URL=https://auth-service-production-416b.up.railway.app/" >> $GITHUB_ENV
-
-          COMMIT=$(git rev-list -n 1 $LATEST)
-          echo "COMMIT=$COMMIT" >> $GITHUB_ENV
-
-          echo "Latest tag: $LATEST"
-          echo "Previous tag: $PREVIOUS"
-
-      # Pull latest image
-      - name: Pull Latest Image
-        run: docker pull $IMAGE
-
-      # Deploy latest
-      - name: Deploy Latest
+      # ==============================
+      # 🚀 Deploy to Render
+      # ==============================
+      - name: Trigger Render Deploy
         run: |
-          curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_ENVIRONMENT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
-          -H "Authorization: Bearer ${{ secrets.RAILWAY_API_TOKEN_STAGING }}"
+          echo "🚀 Triggering Render Deployment..."
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+          echo "✅ Deploy triggered"
 
-      # Wait
+      # ==============================
+      # ⏳ Wait
+      # ==============================
       - name: Wait
-        run: sleep 30
+        run: sleep 40
 
-      # Health check latest
-      - name: Health Check Latest
-        id: health_latest
+      # ==============================
+      # 🔍 Health Check
+      # ==============================
+      - name: Health Check
         run: |
+          URL="https://backend-auth-service.onrender.com"
           RESPONSE=$(curl -s $URL)
-          echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
+
+          echo "Response: $RESPONSE"
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
-            echo "STATUS=success" >> $GITHUB_ENV
-            exit 0
+            echo "✅ Deployment Successful"
           else
-            echo "STATUS=fail" >> $GITHUB_ENV
+            echo "❌ Deployment Failed"
             exit 1
           fi
 
-      # ================================
-      # FALLBACK → PREVIOUS TAG
-      # ================================
-      - name: Pull Previous Image
-        if: failure()
-        run: docker pull $PREV_IMAGE
-
-      - name: Deploy Previous
-        if: failure()
-        run: |
-          curl -X POST "https://backboard.railway.app/project/${{ secrets.RAILWAY_ENVIRONMENT_ID_STAGING }}/service/${{ secrets.RAILWAY_SERVICE_ID_STAGING }}/deploy" \
-          -H "Authorization: Bearer ${{ secrets.RAILWAY_API_TOKEN_STAGING }}"
-
-      - name: Wait (Fallback)
-        if: failure()
-        run: sleep 30
-
-      - name: Health Check Previous
-        if: failure()
-        id: health_prev
-        run: |
-          RESPONSE=$(curl -s $URL)
-          echo "PREV_RESPONSE=$RESPONSE" >> $GITHUB_ENV
-
-          if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
-            echo "FALLBACK_STATUS=success" >> $GITHUB_ENV
-            exit 0
-          else
-            echo "FALLBACK_STATUS=fail" >> $GITHUB_ENV
-            exit 1
-          fi
-
-      # ================================
-      # EMAILS
-      # ================================
-
-      # SUCCESS (latest)
-      - name: Email Success (Latest)
-        if: success() && env.STATUS == 'success'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "🚀 PROD DEPLOY SUCCESS - ${{ env.TAG }}"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            PROD DEPLOY SUCCESS 🚀
-
-            Tag: ${{ env.TAG }}
-            Commit: ${{ env.COMMIT }}
-            Image: ${{ env.IMAGE }}
-
-            URL:
-            ${{ env.URL }}
-
-            Response:
-            ${{ env.RESPONSE }}
-
-      # FALLBACK SUCCESS
-      - name: Email Fallback Success
-        if: env.FALLBACK_STATUS == 'success'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "⚠️ FALLBACK DEPLOY SUCCESS - ${{ env.PREV_TAG }}"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            FALLBACK DEPLOY SUCCESS ⚠️
-
-            Failed Tag: ${{ env.TAG }}
-            Rolled back to: ${{ env.PREV_TAG }}
-
-            URL:
-            ${{ env.URL }}
-
-            Response:
-            ${{ env.PREV_RESPONSE }}
-
-      # FINAL FAILURE
-      - name: Email Final Failure
-        if: failure() && env.FALLBACK_STATUS == 'fail'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "🚨 PROD DEPLOY FAILED - ACTION REQUIRED"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            🚨 BOTH DEPLOYMENTS FAILED 🚨
-
-            Latest Tag Failed: ${{ env.TAG }}
-            Previous Tag Failed: ${{ env.PREV_TAG }}
-
-            Immediate manual rollback required!
-
-            URL:
-            ${{ env.URL }}
-
+      # ==============================
+      # 🎉 Done
+      # ==============================
       - name: Done
-        run: echo "Deployment flow completed"
+        run: echo "🚀 CD Completed Successfully"
