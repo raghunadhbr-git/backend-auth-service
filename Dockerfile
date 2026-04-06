@@ -1,25 +1,41 @@
-# 🟢 Use lightweight Python image
+# ===============================
+# 🟢 Python Base Image
+# ===============================
 FROM python:3.11-slim
 
-# 🟢 Set working directory
+# ===============================
+# 🟢 Working Directory
+# ===============================
 WORKDIR /app
 
-# 🟢 Copy requirements first (cache)
+# ===============================
+# 🟢 Copy Requirements
+# ===============================
 COPY requirements.txt .
 
-# 🟢 Install dependencies
+# ===============================
+# 🟢 Install Dependencies
+# ===============================
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 🟢 Copy project files
+# ===============================
+# 🟢 Copy App Code
+# ===============================
 COPY . .
 
-# 🟢 Build args (CI will pass these)
+# ===============================
+# 🔥 Build Arguments (FROM CI)
+# ===============================
 ARG APP_VERSION=unknown
 ARG APP_COMMIT=unknown
 
-# 🟢 Set env inside container
+# ===============================
+# 🔥 Set ENV (INSIDE CONTAINER)
+# ===============================
 ENV APP_VERSION=$APP_VERSION
 ENV APP_COMMIT=$APP_COMMIT
 
-# 🟢 Run app (Render compatible)
+# ===============================
+# 🟢 Run App
+# ===============================
 CMD ["sh", "-c", "gunicorn run:app -w 1 -b 0.0.0.0:$PORT --access-logfile - --error-logfile -"]
