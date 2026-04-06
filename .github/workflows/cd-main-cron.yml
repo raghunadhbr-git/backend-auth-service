@@ -1,14 +1,9 @@
-name: CD - Render Deploy (Rollback + Email + Manual)
+name: CD - Render Deploy (Latest)
 
 on:
   workflow_dispatch:
-    inputs:
-      manual_tag:
-        description: "Optional tag for manual emergency deploy"
-        required: false
-
   schedule:
-    - cron: "30 20 * * *"   # 2 AM IST
+    - cron: "30 20 * * *"
 
 jobs:
   deploy:
@@ -16,192 +11,49 @@ jobs:
 
     steps:
 
-      # ==============================
-      # 📥 Checkout
-      # ==============================
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # ==============================
-      # 🔍 Fetch Tags
-      # ==============================
       - name: Fetch Tags
-        run: git fetch --tags
+        run: |
+          echo "Fetching tags..."
+          git fetch --tags
 
-      # ==============================
-      # 🧠 Get Tags
-      # ==============================
-      - name: Get Tags
+      - name: Detect Latest Tag
         run: |
           TAGS=($(git tag --sort=-v:refname))
           LATEST=${TAGS[0]}
-          PREVIOUS=${TAGS[1]}
-
           echo "LATEST=$LATEST" >> $GITHUB_ENV
-          echo "PREVIOUS=$PREVIOUS" >> $GITHUB_ENV
+          echo "Latest tag: $LATEST"
 
-          echo "🚀 Latest Tag: $LATEST"
-          echo "⚠️ Previous Tag: $PREVIOUS"
-
-      # ==============================
-      # 🧠 Manual Override
-      # ==============================
-      - name: Manual Tag Override
-        if: ${{ github.event.inputs.manual_tag != '' }}
+      - name: Deploy to Render
         run: |
-          echo "LATEST=${{ github.event.inputs.manual_tag }}" >> $GITHUB_ENV
-          echo "⚡ Manual Deploy Tag: $LATEST"
-
-      # ==============================
-      # 🚀 Deploy Latest
-      # ==============================
-      - name: Deploy Latest
-        id: deploy_latest
-        run: |
-          echo "🚀 Deploying latest (Render)..."
+          echo "Triggering Render deploy..."
           curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
 
-      # ==============================
-      # ⏳ Wait
-      # ==============================
       - name: Wait
-        run: sleep 40
-
-      # ==============================
-      # 🔍 Health Check Latest
-      # ==============================
-      - name: Health Check Latest
-        id: health_latest
         run: |
-          URL="https://backend-auth-service-ks6f.onrender.com"
-          RESPONSE=$(curl -s $URL)
+          echo "Waiting for deployment..."
+          sleep 40
 
-          echo "RESPONSE=$RESPONSE" >> $GITHUB_ENV
-
-          if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
-            echo "STATUS=success" >> $GITHUB_ENV
-            exit 0
-          else
-            echo "STATUS=fail" >> $GITHUB_ENV
-            exit 1
-          fi
-
-      # ==============================
-      # 📧 Email First Failure
-      # ==============================
-      - name: Email First Attempt Failed
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "⚠️ FIRST DEPLOY FAILED"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            First deployment failed ❌
-
-            Trying rollback...
-
-      # ==============================
-      # 🔁 Rollback Deploy
-      # ==============================
-      - name: Rollback Deploy
-        if: failure()
-        run: |
-          echo "⚠️ Rolling back (triggering deploy again)..."
-          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
-
-      # ==============================
-      # ⏳ Wait Rollback
-      # ==============================
-      - name: Wait Rollback
-        if: failure()
-        run: sleep 40
-
-      # ==============================
-      # 🔍 Health Check Rollback
-      # ==============================
-      - name: Health Check Rollback
-        if: failure()
-        id: health_rollback
+      - name: Health Check
         run: |
           URL="https://backend-auth-service.onrender.com"
           RESPONSE=$(curl -s $URL)
 
-          echo "ROLLBACK_RESPONSE=$RESPONSE" >> $GITHUB_ENV
+          echo "Response: $RESPONSE"
 
           if [[ "$RESPONSE" == *"Auth service started successfully"* ]]; then
-            echo "ROLLBACK_STATUS=success" >> $GITHUB_ENV
-            exit 0
+            echo "Deployment success"
           else
-            echo "ROLLBACK_STATUS=fail" >> $GITHUB_ENV
+            echo "Deployment failed"
             exit 1
           fi
 
-      # ==============================
-      # 📧 Success (Latest)
-      # ==============================
-      - name: Email Success
-        if: success() && env.STATUS == 'success'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "🚀 DEPLOY SUCCESS"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            Deployment successful 🚀
-
-            URL:
-            https://backend-auth-service.onrender.com
-
-      # ==============================
-      # 📧 Fallback Success
-      # ==============================
-      - name: Email Rollback Success
-        if: env.ROLLBACK_STATUS == 'success'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "⚠️ ROLLBACK SUCCESS"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            Rollback deployment successful ⚠️
-
-      # ==============================
-      # 📧 FINAL FAILURE
-      # ==============================
-      - name: Email Final Failure
-        if: failure() && env.ROLLBACK_STATUS == 'fail'
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME_STAGING }}
-          password: ${{ secrets.MAIL_PASSWORD_DEV }}
-          subject: "🚨 DEPLOYMENT FAILED - ACTION REQUIRED"
-          to: ${{ secrets.MAIL_TO_STAGING }}
-          cc: ${{ secrets.MAIL_CC_STAGING }}
-          from: ${{ secrets.MAIL_USERNAME_STAGING }}
-          body: |
-            BOTH deployments failed ❌
-
-            Manual intervention required immediately!
-
-      - name: Done
-        run: echo "CD Flow Completed"
+      - name: Summary
+        run: |
+          echo "CD DONE"
+          echo "Latest Tag: $LATEST"
+          echo "Deployed: latest image"
