@@ -2,34 +2,23 @@
 # 🟦 AUTH SERVICE – BUSINESS LOGIC + DB HANDLING
 # =====================================================
 
-from flask import current_app
+from flask import current_app, g
 from sqlalchemy.exc import IntegrityError
 from app.models.user import User
 from app.extensions import db
 
 
 def register_user(email: str, password: str, role: str = "user"):
-    """
-    Handles:
-    - User creation
-    - Password hashing
-    - Duplicate handling (race condition safe)
-    """
 
     try:
-        user = User(
-            email=email,
-            role=role
-        )
-
-        # Secure password hashing
+        user = User(email=email, role=role)
         user.set_password(password)
 
         db.session.add(user)
         db.session.commit()
 
         current_app.logger.info(
-            f"User created id={user.id}, email={user.email}"
+            f"[REQ:{g.request_id}] User created id={user.id}, email={user.email}"
         )
 
         return {
@@ -38,8 +27,11 @@ def register_user(email: str, password: str, role: str = "user"):
         }, 201
 
     except IntegrityError:
-        # Handles duplicate email / race condition
         db.session.rollback()
+
+        current_app.logger.warning(
+            f"[REQ:{g.request_id}] Duplicate user {email}"
+        )
 
         return {
             "message": "User already exists"
