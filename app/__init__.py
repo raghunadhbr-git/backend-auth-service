@@ -11,6 +11,7 @@ from flask import Flask, jsonify, g, request
 from .config import Config
 from .extensions import db, migrate, jwt, cors
 
+# Import models (Alembic)
 from .models.user import User
 from .models.token_blacklist import TokenBlocklist
 
@@ -20,7 +21,10 @@ from .models.token_blacklist import TokenBlocklist
 # =====================================================
 class RequestFormatter(logging.Formatter):
     def format(self, record):
-        record.request_id = getattr(g, "request_id", "N/A")
+        try:
+            record.request_id = getattr(g, "request_id", "N/A")
+        except RuntimeError:
+            record.request_id = "N/A"
         return super().format(record)
 
 
@@ -67,7 +71,7 @@ def create_app(testing: bool = False):
         return response
 
     # --------------------------
-    # 🔹 Logging
+    # 🔹 Logging setup
     # --------------------------
     logs_path = os.path.join(os.getcwd(), "logs")
     os.makedirs(logs_path, exist_ok=True)
@@ -88,7 +92,7 @@ def create_app(testing: bool = False):
         app.logger.addHandler(handler)
 
     app.logger.setLevel(logging.INFO)
-    app.logger.info("Auth service starting...")
+    app.logger.info("🚀 Auth service starting...")
 
     # --------------------------
     # 🔹 Register routes
@@ -97,10 +101,12 @@ def create_app(testing: bool = False):
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
 
     # --------------------------
-    # 🔹 HEALTH CHECK
+    # 🔥 ROOT HEALTH CHECK (UPDATED WITH LOG)
     # --------------------------
     @app.get("/")
     def health():
+        app.logger.info(f"[REQ:{g.request_id}] Root health endpoint called")
+
         return jsonify({
             "status": "Auth service running",
             "version": os.getenv("APP_VERSION", "unknown"),
@@ -115,5 +121,5 @@ def create_app(testing: bool = False):
         jti = jwt_payload.get("jti")
         return TokenBlocklist.query.filter_by(jti=jti).first() is not None
 
-    app.logger.info("Auth service started successfully.")
+    app.logger.info("✅ Auth service started successfully.")
     return app
