@@ -1,18 +1,27 @@
 # =====================================================
-# 🟦 APP FACTORY – FINAL VERSION (CI/CD READY)
+# 🟦 APP FACTORY – FINAL VERSION (CI/CD + REQUEST ID)
 # =====================================================
 
 import os
 import logging
+import uuid
 from logging.handlers import TimedRotatingFileHandler
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, g, request
 from .config import Config
 from .extensions import db, migrate, jwt, cors
 
-# Import models for Alembic
 from .models.user import User
 from .models.token_blacklist import TokenBlocklist
+
+
+# =====================================================
+# 🔹 REQUEST ID LOG FORMATTER
+# =====================================================
+class RequestFormatter(logging.Formatter):
+    def format(self, record):
+        record.request_id = getattr(g, "request_id", "N/A")
+        return super().format(record)
 
 
 def create_app(testing: bool = False):
@@ -39,8 +48,26 @@ def create_app(testing: bool = False):
     migrate.init_app(app, db)
     jwt.init_app(app)
 
+    # =====================================================
+    # 🔥 REQUEST ID MIDDLEWARE
+    # =====================================================
+
+    @app.before_request
+    def assign_request_id():
+        incoming_id = request.headers.get("X-Request-ID")
+
+        if incoming_id:
+            g.request_id = incoming_id
+        else:
+            g.request_id = str(uuid.uuid4())
+
+    @app.after_request
+    def attach_request_id(response):
+        response.headers["X-Request-ID"] = g.request_id
+        return response
+
     # --------------------------
-    # 🔹 Logging setup
+    # 🔹 Logging
     # --------------------------
     logs_path = os.path.join(os.getcwd(), "logs")
     os.makedirs(logs_path, exist_ok=True)
@@ -53,15 +80,15 @@ def create_app(testing: bool = False):
         encoding="utf-8"
     )
 
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(message)s"
+    handler.setFormatter(RequestFormatter(
+        "%(asctime)s [%(levelname)s] [REQ:%(request_id)s] %(message)s"
     ))
 
     if not app.logger.handlers:
         app.logger.addHandler(handler)
 
     app.logger.setLevel(logging.INFO)
-    app.logger.info("🚀 Auth service starting...")
+    app.logger.info("Auth service starting...")
 
     # --------------------------
     # 🔹 Register routes
@@ -70,14 +97,12 @@ def create_app(testing: bool = False):
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
 
     # --------------------------
-    # 🔥 HEALTH CHECK (FINAL)
+    # 🔹 HEALTH CHECK
     # --------------------------
     @app.get("/")
     def health():
         return jsonify({
             "status": "Auth service running",
-
-            # 🔥 Dynamic values from CI/CD (IMPORTANT)
             "version": os.getenv("APP_VERSION", "unknown"),
             "commit": os.getenv("APP_COMMIT", "unknown")
         }), 200
@@ -90,5 +115,5 @@ def create_app(testing: bool = False):
         jti = jwt_payload.get("jti")
         return TokenBlocklist.query.filter_by(jti=jti).first() is not None
 
-    app.logger.info("✅ Auth service started successfully.")
+    app.logger.info("Auth service started successfully.")
     return app
