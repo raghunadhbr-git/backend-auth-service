@@ -3,6 +3,7 @@
 # DEBUG VERSION (Where to put breakpoints + what to inspect)
 # =====================================================
 
+# Import libraries
 from flask import Flask, Blueprint, request, jsonify
 from flask_jwt_extended import (
     JWTManager, create_access_token,
@@ -10,7 +11,7 @@ from flask_jwt_extended import (
 )
 import hashlib
 
-
+# Flask app factory pattern with layered structure:
 def create_app():
     app = Flask(__name__)
     app.config["JWT_SECRET_KEY"] = "super-secret-key"
@@ -18,10 +19,10 @@ def create_app():
     jwt = JWTManager(app)
 
     # =====================================================
-    # MODEL LAYER
+    # MODEL LAYER (DB Simulation - In Memory)
     # =====================================================
-    users = {}
-    blacklist = set()
+    users = {}         # {email: {id, password}}
+    blacklist = set()  # token blacklist
 
     def create_user(email, hashed_password):
         # 🔴 DEBUG POINT (MODEL - CREATE)
@@ -44,9 +45,12 @@ def create_app():
 
 
     # =====================================================
-    # SERVICE LAYER
+    # SERVICE LAYER (Business Logic)
     # =====================================================
     def register_service(email, password):
+        # Input: email(str), password(str)
+        # Output: JSON response
+        
         # 🔴 DEBUG POINT (SERVICE ENTRY)
         print("SERVICE: Register called")
 
@@ -128,10 +132,11 @@ def create_app():
 
 
     # =====================================================
-    # ROUTE LAYER
+    # ROUTE LAYER (Controller)
     # =====================================================
     auth_bp = Blueprint("auth", __name__)
 
+    # -------- REGISTER --------
     @auth_bp.post("/angularUser/register")
     def register():
         # 🔴 DEBUG POINT (ROUTE ENTRY)
@@ -149,7 +154,7 @@ def create_app():
 
         return jsonify(response), status
 
-
+    # -------- LOGIN --------
     @auth_bp.post("/angularUser/login")
     def login():
         # 🔴 DEBUG POINT
@@ -164,7 +169,8 @@ def create_app():
 
         return jsonify(response), status
 
-
+    
+    # -------- PROFILE --------
     @auth_bp.get("/profile")
     @jwt_required()
     def profile():
@@ -176,6 +182,7 @@ def create_app():
         return jsonify(response), status
 
 
+    # -------- LOGOUT --------
     @auth_bp.post("/logout")
     @jwt_required()
     def logout():
@@ -188,21 +195,30 @@ def create_app():
 
 
     # =====================================================
-    # HEALTH CHECK
+    # HEALTH CHECK (ROOT LEVEL)
     # =====================================================
     @app.get("/")
     def health_root():
-        return jsonify({"status": "UP"}), 200
+        return jsonify({
+            "status": "UP",
+            "service": "auth-service"
+        }), 200
 
+    # ---------------------------
+    # HEALTH CHECK (EXPLICIT)
+    # ---------------------------
     @app.get("/health")
     def health():
-        return jsonify({"status": "UP"}), 200
+        return jsonify({
+            "status": "UP",
+            "service": "auth-service"
+        }), 200
 
 
     app.register_blueprint(auth_bp, url_prefix="/api/v1/auth")
     return app
 
-
+# Run the app
 if __name__ == "__main__":
     app = create_app()
     app.run(debug=True)
