@@ -1,0 +1,26 @@
+# ==========================================
+# 🚀 FIX GIT ISSUE (DETACHED HEAD + PUSH ERROR)
+# ==========================================
+
+# 🟢 Step 1: Switch back to main branch
+git checkout main
+
+# 🟢 Step 2: Fetch latest changes from remote
+git fetch origin
+
+# 🟢 Step 3: Reset local main to match remote
+git reset --hard origin/main
+
+# 🟢 Step 4: Apply your latest commit (replace with your commit id if different)
+git cherry-pick 8c66231
+
+# 🟢 Step 5: Push to GitHub
+git push origin main
+
+# ==========================================
+# ✅ DONE
+# ==========================================
+
+# ⚠️ If conflict occurs:
+# git add .
+# git cherry-pick --continue
