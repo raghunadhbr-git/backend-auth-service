@@ -145,4 +145,4 @@ def test_token_invalid_after_logout(client):
 # =====================================================
 # HOW TO RUN TESTS
 # =====================================================
-# pytest test_auth_layered.py -v
+# pytest .\practice\test_auth_both.py -v
